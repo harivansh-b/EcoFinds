@@ -54,12 +54,12 @@ class PreviousPurchasesScreen extends StatelessWidget {
         elevation: 0,
       ),
       body: purchases.isEmpty
-          ? _buildEmptyState()
+          ? _buildEmptyState(context)
           : _buildPurchasesList(),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

@@ -791,7 +791,7 @@ class _MyListingsScreenState extends State<MyListingsScreen>
             Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
             SizedBox(width: 8),
             Text(
-              'Add Eco Item',
+              'Add Item',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
