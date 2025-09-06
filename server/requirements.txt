@@ -13,5 +13,4 @@ python-multipart
 httpx
 itsdangerous
 uvicorn[standard]
-bson
 pydantic[email]
