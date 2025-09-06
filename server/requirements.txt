@@ -14,3 +14,4 @@ httpx
 itsdangerous
 uvicorn[standard]
 bson
+pydantic[email]

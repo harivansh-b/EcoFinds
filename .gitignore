@@ -1,4 +1,10 @@
 .vscode
 .DS_STORE
-.env
+/server/.env
+/server/venv
 .venv
+/server/__pycache__
+/server/db/__pycache__
+/server/auth_service/__pycache__
+/server/user_services/__pycache__
+/server/product_services/__pycache__
