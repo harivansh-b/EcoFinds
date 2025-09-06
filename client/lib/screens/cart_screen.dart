@@ -1,6 +1,6 @@
+import 'package:eco_finds/screens/payment.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../models/product.dart';
 
 // EcoFinds Color Palette (consistent with other screens)
@@ -39,11 +39,6 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _isProcessingOrder = false;
-  
-  // Razorpay integration
-  late Razorpay _razorpay;
-  String _paymentStatus = "";
-  bool _isPaymentInProgress = false;
 
   @override
   void initState() {
@@ -60,101 +55,56 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
       curve: Curves.easeInOut,
     ));
     _animationController.forward();
-    
-    // Initialize Razorpay
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
   }
 
   @override
   void dispose() {
     _animationController.dispose();
-    _razorpay.clear();
     super.dispose();
   }
 
-  // Razorpay event handlers
-  void _handlePaymentSuccess(PaymentSuccessResponse response) {
-    setState(() {
-      _isPaymentInProgress = false;
-      _paymentStatus = "Payment successful!";
-    });
-    
-    // Clear cart and show success message
-    _clearCartAndShowSuccess(response.paymentId);
+  // Navigate to the PaymentScreen to handle the payment process
+  void _startPayment(double totalAmount) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentScreen(
+          // Convert Product list to a generic map for the payment screen
+          cartItems: widget.cartItems.map((product) {
+            return {
+              'id': product.id,
+              'title': product.title,
+              'price': product.price,
+            };
+          }).toList(),
+          totalAmount: totalAmount,
+          customerId: 'CUST-001', // Example customer ID
+          onPaymentSuccess: () {
+            // This callback is triggered from PaymentScreen on success
+            Navigator.pop(context); // Pop the payment screen
+            _clearCartAndShowSuccess(); // Clear the cart and show confirmation
+          },
+        ),
+      ),
+    );
   }
 
-  void _handlePaymentError(PaymentFailureResponse response) {
-    setState(() {
-      _isPaymentInProgress = false;
-      _paymentStatus = "Payment failed. Please try again.";
-    });
-    
-    _showPaymentErrorDialog(response.message ?? "Payment failed");
-  }
-
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    setState(() {
-      _paymentStatus = "Processing wallet payment...";
-    });
-  }
-
-  void _startPayment(double amount) {
-    var options = {
-      'key': 'rzp_test_zk5c0q1Ahl5aqc', // Replace with your live key
-      'amount': (amount * 100).toInt(), // Amount in paise
-      'currency': 'INR',
-      'name': 'EcoFinds Marketplace',
-      'description': 'Sustainable shopping for a better tomorrow',
-      'prefill': {
-        'contact': '9876543210',
-        'email': 'test@example.com',
-      },
-      'theme': {'color': '#2E7D32'}, // EcoFinds primary green
-    };
-
-    try {
-      setState(() {
-        _isPaymentInProgress = true;
-        _paymentStatus = "Opening secure payment gateway...";
-      });
-      _razorpay.open(options);
-    } catch (e) {
-      setState(() {
-        _isPaymentInProgress = false;
-        _paymentStatus = "Error opening payment gateway";
-      });
-      _showPaymentErrorDialog("Failed to open payment gateway");
-    }
-  }
-
-  void _clearCartAndShowSuccess(String? paymentId) {
-    // Clear all cart items
-    for (var item in widget.cartItems) {
+  // This is now called from the onPaymentSuccess callback
+  void _clearCartAndShowSuccess() {
+    // A copy of the list is needed before clearing it
+    final itemsToRemove = List<Product>.from(widget.cartItems);
+    for (var item in itemsToRemove) {
       widget.onRemoveFromCart(item);
     }
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
+        content: const Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 8),
+            Icon(Icons.check_circle, color: Colors.white),
+            SizedBox(width: 8),
             Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Order placed successfully! 🌱'),
-                  if (paymentId != null)
-                    Text(
-                      'Payment ID: $paymentId',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                ],
-              ),
+              child: Text('Order placed successfully! 🌱'),
             ),
           ],
         ),
@@ -169,61 +119,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _showPaymentErrorDialog(String errorMessage) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          icon: const Icon(
-            Icons.error_outline,
-            color: EcoColors.errorRed,
-            size: 48,
-          ),
-          title: const Text(
-            'Payment Failed',
-            style: TextStyle(
-              color: EcoColors.textDark,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            errorMessage,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: EcoColors.textLight),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: EcoColors.textLight,
-              ),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Retry payment with the same amount
-                double subtotal = widget.cartItems.fold(0, (sum, item) => sum + item.price);
-                double deliveryFee = subtotal > 100 ? 0 : 5.99;
-                double total = subtotal + deliveryFee;
-                _startPayment(total);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: EcoColors.secondaryGreen,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Retry Payment'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
+  // No changes needed below this line, but it's included for completeness.
+  // ... (build methods and other UI logic remains the same)
+  // ...
   @override
   Widget build(BuildContext context) {
     double subtotal = widget.cartItems.fold(0, (sum, item) => sum + item.price);
@@ -657,65 +555,6 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                 
                 const SizedBox(height: 24),
                 
-                // Payment Status (if payment is in progress)
-                if (_isPaymentInProgress || _paymentStatus.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: _isPaymentInProgress 
-                          ? EcoColors.skyBlue.withOpacity(0.1)
-                          : _paymentStatus.contains("successful")
-                              ? EcoColors.successGreen.withOpacity(0.1)
-                              : EcoColors.errorRed.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _isPaymentInProgress 
-                            ? EcoColors.skyBlue.withOpacity(0.3)
-                            : _paymentStatus.contains("successful")
-                                ? EcoColors.successGreen.withOpacity(0.3)
-                                : EcoColors.errorRed.withOpacity(0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        if (_isPaymentInProgress)
-                          const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: EcoColors.skyBlue,
-                            ),
-                          )
-                        else
-                          Icon(
-                            _paymentStatus.contains("successful") 
-                                ? Icons.check_circle 
-                                : Icons.error_outline,
-                            color: _paymentStatus.contains("successful")
-                                ? EcoColors.successGreen
-                                : EcoColors.errorRed,
-                            size: 20,
-                          ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _paymentStatus,
-                            style: TextStyle(
-                              color: _isPaymentInProgress 
-                                  ? EcoColors.skyBlue
-                                  : _paymentStatus.contains("successful")
-                                      ? EcoColors.successGreen
-                                      : EcoColors.errorRed,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                
                 // Eco Impact Message
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -764,7 +603,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: (_isProcessingOrder || _isPaymentInProgress) ? null : () => _startPayment(total),
+                    onPressed: _isProcessingOrder ? null : () => _startPayment(total),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EcoColors.successGreen,
                       foregroundColor: Colors.white,
@@ -775,7 +614,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                       ),
                       disabledBackgroundColor: Colors.grey.shade300,
                     ),
-                    child: (_isProcessingOrder || _isPaymentInProgress)
+                    child: _isProcessingOrder
                         ? const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -797,7 +636,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                               Icon(Icons.payment, size: 20),
                               SizedBox(width: 8),
                               Text(
-                                'Pay with Razorpay',
+                                'Proceed to Payment',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -854,7 +693,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Secured by Razorpay',
+                      'Secure Payments',
                       style: TextStyle(
                         color: EcoColors.textLight,
                         fontSize: 12,
