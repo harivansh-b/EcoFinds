@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../models/product.dart';
 
 // EcoFinds Color Palette (consistent with other screens)
@@ -38,6 +39,11 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _isProcessingOrder = false;
+  
+  // Razorpay integration
+  late Razorpay _razorpay;
+  String _paymentStatus = "";
+  bool _isPaymentInProgress = false;
 
   @override
   void initState() {
@@ -54,12 +60,168 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
       curve: Curves.easeInOut,
     ));
     _animationController.forward();
+    
+    // Initialize Razorpay
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _razorpay.clear();
     super.dispose();
+  }
+
+  // Razorpay event handlers
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    setState(() {
+      _isPaymentInProgress = false;
+      _paymentStatus = "Payment successful!";
+    });
+    
+    // Clear cart and show success message
+    _clearCartAndShowSuccess(response.paymentId);
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    setState(() {
+      _isPaymentInProgress = false;
+      _paymentStatus = "Payment failed. Please try again.";
+    });
+    
+    _showPaymentErrorDialog(response.message ?? "Payment failed");
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    setState(() {
+      _paymentStatus = "Processing wallet payment...";
+    });
+  }
+
+  void _startPayment(double amount) {
+    var options = {
+      'key': 'rzp_test_zk5c0q1Ahl5aqc', // Replace with your live key
+      'amount': (amount * 100).toInt(), // Amount in paise
+      'currency': 'INR',
+      'name': 'EcoFinds Marketplace',
+      'description': 'Sustainable shopping for a better tomorrow',
+      'prefill': {
+        'contact': '9876543210',
+        'email': 'test@example.com',
+      },
+      'theme': {'color': '#2E7D32'}, // EcoFinds primary green
+    };
+
+    try {
+      setState(() {
+        _isPaymentInProgress = true;
+        _paymentStatus = "Opening secure payment gateway...";
+      });
+      _razorpay.open(options);
+    } catch (e) {
+      setState(() {
+        _isPaymentInProgress = false;
+        _paymentStatus = "Error opening payment gateway";
+      });
+      _showPaymentErrorDialog("Failed to open payment gateway");
+    }
+  }
+
+  void _clearCartAndShowSuccess(String? paymentId) {
+    // Clear all cart items
+    for (var item in widget.cartItems) {
+      widget.onRemoveFromCart(item);
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Order placed successfully! 🌱'),
+                  if (paymentId != null)
+                    Text(
+                      'Payment ID: $paymentId',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: EcoColors.successGreen,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  void _showPaymentErrorDialog(String errorMessage) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          icon: const Icon(
+            Icons.error_outline,
+            color: EcoColors.errorRed,
+            size: 48,
+          ),
+          title: const Text(
+            'Payment Failed',
+            style: TextStyle(
+              color: EcoColors.textDark,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            errorMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: EcoColors.textLight),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: EcoColors.textLight,
+              ),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Retry payment with the same amount
+                double subtotal = widget.cartItems.fold(0, (sum, item) => sum + item.price);
+                double deliveryFee = subtotal > 100 ? 0 : 5.99;
+                double total = subtotal + deliveryFee;
+                _startPayment(total);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: EcoColors.secondaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Retry Payment'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -341,7 +503,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '\$${product.price.toStringAsFixed(2)}',
+                    '₹${product.price.toStringAsFixed(2)}',
                     style: const TextStyle(
                       color: EcoColors.secondaryGreen,
                       fontWeight: FontWeight.bold,
@@ -434,7 +596,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
               children: [
                 _buildSummaryRow(
                   'Items (${widget.cartItems.length})',
-                  '\$${subtotal.toStringAsFixed(2)}',
+                  '₹${subtotal.toStringAsFixed(2)}',
                 ),
                 const SizedBox(height: 12),
                 
@@ -442,7 +604,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   'Delivery Fee',
                   deliveryFee == 0 
                       ? 'FREE' 
-                      : '\$${deliveryFee.toStringAsFixed(2)}',
+                      : '₹${deliveryFee.toStringAsFixed(2)}',
                   valueColor: deliveryFee == 0 ? EcoColors.successGreen : null,
                   isFree: deliveryFee == 0,
                 ),
@@ -469,7 +631,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Add \$${(100 - subtotal).toStringAsFixed(2)} more for FREE eco-delivery!',
+                              'Add ₹${(100 - subtotal).toStringAsFixed(2)} more for FREE eco-delivery!',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: EcoColors.warningOrange,
@@ -489,11 +651,70 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                 
                 _buildSummaryRow(
                   'Total:',
-                  '\$${total.toStringAsFixed(2)}',
+                  '₹${total.toStringAsFixed(2)}',
                   isTotal: true,
                 ),
                 
                 const SizedBox(height: 24),
+                
+                // Payment Status (if payment is in progress)
+                if (_isPaymentInProgress || _paymentStatus.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: _isPaymentInProgress 
+                          ? EcoColors.skyBlue.withOpacity(0.1)
+                          : _paymentStatus.contains("successful")
+                              ? EcoColors.successGreen.withOpacity(0.1)
+                              : EcoColors.errorRed.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _isPaymentInProgress 
+                            ? EcoColors.skyBlue.withOpacity(0.3)
+                            : _paymentStatus.contains("successful")
+                                ? EcoColors.successGreen.withOpacity(0.3)
+                                : EcoColors.errorRed.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        if (_isPaymentInProgress)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: EcoColors.skyBlue,
+                            ),
+                          )
+                        else
+                          Icon(
+                            _paymentStatus.contains("successful") 
+                                ? Icons.check_circle 
+                                : Icons.error_outline,
+                            color: _paymentStatus.contains("successful")
+                                ? EcoColors.successGreen
+                                : EcoColors.errorRed,
+                            size: 20,
+                          ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _paymentStatus,
+                            style: TextStyle(
+                              color: _isPaymentInProgress 
+                                  ? EcoColors.skyBlue
+                                  : _paymentStatus.contains("successful")
+                                      ? EcoColors.successGreen
+                                      : EcoColors.errorRed,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 
                 // Eco Impact Message
                 Container(
@@ -543,7 +764,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isProcessingOrder ? null : () => _showCheckoutDialog(context, total),
+                    onPressed: (_isProcessingOrder || _isPaymentInProgress) ? null : () => _startPayment(total),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EcoColors.successGreen,
                       foregroundColor: Colors.white,
@@ -554,7 +775,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                       ),
                       disabledBackgroundColor: Colors.grey.shade300,
                     ),
-                    child: _isProcessingOrder
+                    child: (_isProcessingOrder || _isPaymentInProgress)
                         ? const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -573,10 +794,10 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                         : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.shopping_cart_checkout, size: 20),
+                              Icon(Icons.payment, size: 20),
                               SizedBox(width: 8),
                               Text(
-                                'Proceed to Checkout',
+                                'Pay with Razorpay',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -618,6 +839,28 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Security Footer
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.security,
+                      color: EcoColors.textLight,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Secured by Razorpay',
+                      style: TextStyle(
+                        color: EcoColors.textLight,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -735,149 +978,6 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                 foregroundColor: Colors.white,
               ),
               child: const Text('Remove'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showCheckoutDialog(BuildContext context, double total) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          icon: const Icon(
-            Icons.eco,
-            color: EcoColors.successGreen,
-            size: 48,
-          ),
-          title: const Text(
-            'Complete Your Order',
-            style: TextStyle(
-              color: EcoColors.textDark,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: EcoColors.warmBeige,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Items:', style: TextStyle(color: EcoColors.textDark)),
-                        Text('\$${(total - (total > 100 ? 0 : 5.99)).toStringAsFixed(2)}'),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Delivery:', style: TextStyle(color: EcoColors.textDark)),
-                        Text(total > 100 ? "FREE" : "\$5.99"),
-                      ],
-                    ),
-                    const Divider(color: EcoColors.primaryGreen),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Total:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: EcoColors.textDark,
-                          ),
-                        ),
-                        Text(
-                          '\$${total.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: EcoColors.successGreen,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: EcoColors.leafGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: EcoColors.leafGreen.withOpacity(0.3)),
-                ),
-                child: const Text(
-                  '🌱 This is a demo app. In a real app, this would process payment and create your eco-friendly order!',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: EcoColors.leafGreen,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: EcoColors.textLight,
-              ),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                setState(() {
-                  _isProcessingOrder = true;
-                });
-                
-                await Future.delayed(const Duration(seconds: 2));
-                
-                if (mounted) {
-                  setState(() {
-                    _isProcessingOrder = false;
-                  });
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.white),
-                          SizedBox(width: 8),
-                          Text('Order placed successfully! 🌱'),
-                        ],
-                      ),
-                      backgroundColor: EcoColors.successGreen,
-                      behavior: SnackBarBehavior.floating,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.eco, size: 18),
-              label: const Text('Place Eco-Order'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: EcoColors.successGreen,
-                foregroundColor: Colors.white,
-              ),
             ),
           ],
         );

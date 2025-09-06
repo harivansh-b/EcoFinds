@@ -1,3 +1,4 @@
+import 'package:eco_finds/screens/settings.dart';
 import 'package:flutter/material.dart';
 
 // EcoFinds Color Palette
@@ -346,13 +347,18 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               
               // Action Buttons
               if (!_isEditing) ...[
-                // Settings Button
+                // Settings Button - UPDATED WITH NAVIGATION
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () {
-                      // Handle settings navigation
+                      // Navigate to Settings Screen
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const SettingsScreen(),
+                        ),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EcoColors.cardBackground,
@@ -592,3 +598,4 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     super.dispose();
   }
 }
+

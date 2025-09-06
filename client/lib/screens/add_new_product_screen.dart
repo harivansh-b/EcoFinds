@@ -17,6 +17,8 @@ class EcoColors {
   static const Color cardBackground = Colors.white;
   static const Color errorRed = Color(0xFFE53935);
   static const Color successGreen = Color(0xFF43A047);
+  static const Color orangeWarning = Color(0xFFFF9800);
+  static const Color blueInfo = Color(0xFF2196F3);
 }
 
 class AddNewProductScreen extends StatefulWidget {
@@ -44,6 +46,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
   late Animation<Offset> _slideAnimation;
   
   String _selectedCategory = 'Electronics';
+  String _selectedStatus = 'Available';
   bool _isSubmitting = false;
   
   // Expanded eco-friendly categories
@@ -56,6 +59,14 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
     {'name': 'Home & Garden', 'icon': Icons.home, 'color': EcoColors.primaryGreen},
   ];
 
+  // Product status options
+  final List<Map<String, dynamic>> statusOptions = [
+    {'name': 'Available', 'icon': Icons.check_circle, 'color': EcoColors.successGreen, 'description': 'Ready for sale'},
+    {'name': 'Reserved', 'icon': Icons.schedule, 'color': EcoColors.orangeWarning, 'description': 'Hold for buyer'},
+    {'name': 'Sold', 'icon': Icons.sell, 'color': EcoColors.textLight, 'description': 'No longer available'},
+    {'name': 'Draft', 'icon': Icons.edit_note, 'color': EcoColors.blueInfo, 'description': 'Not yet published'},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -65,6 +76,8 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
     
     if (widget.product != null) {
       _selectedCategory = widget.product!.category;
+      // Assuming the Product model will have a status field
+      _selectedStatus = widget.product!.status ?? 'Available';
     }
     
     _animationController = AnimationController(
@@ -211,6 +224,12 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
             _buildSectionHeader('Category', Icons.category_outlined),
             const SizedBox(height: 16),
             _buildCategorySelector(),
+            const SizedBox(height: 20),
+
+            // Status Section
+            _buildSectionHeader('Status', Icons.flag_outlined),
+            const SizedBox(height: 16),
+            _buildStatusSelector(),
             const SizedBox(height: 20),
             
             // Description
@@ -375,6 +394,102 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildStatusSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: EcoColors.primaryGreen.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: statusOptions.map((status) {
+          final isSelected = _selectedStatus == status['name'];
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedStatus = status['name'];
+              });
+              HapticFeedback.lightImpact();
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? status['color'].withOpacity(0.1) 
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected 
+                      ? status['color'] 
+                      : Colors.grey.shade200,
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: status['color'].withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      status['icon'],
+                      size: 20,
+                      color: status['color'],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          status['name'],
+                          style: TextStyle(
+                            color: isSelected 
+                                ? status['color'] 
+                                : EcoColors.textDark,
+                            fontWeight: isSelected 
+                                ? FontWeight.bold 
+                                : FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          status['description'],
+                          style: TextStyle(
+                            color: EcoColors.textLight,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(
+                      Icons.check_circle,
+                      color: status['color'],
+                      size: 20,
+                    ),
                 ],
               ),
             ),
@@ -587,6 +702,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
         price: double.parse(_priceController.text),
         image: "https://via.placeholder.com/200",
         isOwned: true,
+        status: _selectedStatus, // Add status to the product
       );
       
       widget.onProductAdded(newProduct);
