@@ -11,3 +11,5 @@ def hello_world():
 
 app.include_router(user_route)
 app.include_router(auth_engine)
+from browsing_services.routes import browse_engine
+app.include_router(browse_engine)

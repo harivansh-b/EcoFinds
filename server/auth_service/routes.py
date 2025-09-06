@@ -46,11 +46,6 @@ async def login_api(request: LoginModel):
         
         user = User(**user_doc)
         
-        await db.user.update_one(
-            {"_id": user.id},
-            {"$set": {"lastAccessed": datetime.now(timezone.utc)}}
-        )
-        
         is_password_valid = auth_util.verify_password(request.pwd, user.pwd)
         
         if not is_password_valid:
@@ -80,7 +75,6 @@ async def login_api(request: LoginModel):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
-
 
 @auth_engine.post("/email/signup", dependencies=[Depends(verify_auth_api)])
 async def signup_api(response: SignupModel):

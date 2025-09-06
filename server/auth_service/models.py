@@ -9,6 +9,8 @@ class User(BaseModel):
     pwd: str = Field(..., description="Password")
     email: EmailStr = Field(..., description="Email")
     location: str = Field(..., description="Location")
+    lattitude: str = Field(..., description="Location")
+    longitude: str = Field(..., description="Location")
     createdAt: datetime = Field(..., description="User signup time")
     phoneno: str = Field(..., description="Phone number")
     profilePic: str = Field(..., description="Profile picture URL")
