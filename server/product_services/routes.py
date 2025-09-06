@@ -69,4 +69,32 @@ async def update_product(product_id: str, product_data: ProductUpdateModel, db=D
     updated_product = await products_collection.find_one({"_id": product_id})
     return {"message": "Product updated successfully", "product": updated_product}
 
+@product_route.get("/getproducts/{user_id}", dependencies=[Depends(verify_auth_api)])
+async def get_products(user_id: str, db=Depends(get_db)):
+    products_collection = db["products"]
 
+    cursor = products_collection.find({"seller_id": user_id})
+    products = []
+    
+    async for product in cursor:
+        product["_id"] = str(product["_id"])
+        products.append(product)
+
+    if not products:
+        raise HTTPException(status_code=404, detail="No products found for this user")
+
+    return {"user_id": user_id, "products": products}
+
+
+@product_route.get("/getproduct/{product_id}", dependencies=[Depends(verify_auth_api)])
+async def get_product(product_id: str, db=Depends(get_db)):
+    products_collection = db["products"]
+
+    product = await products_collection.find_one({"_id": product_id})
+
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    product["_id"] = str(product["_id"])
+
+    return {"product": product}
