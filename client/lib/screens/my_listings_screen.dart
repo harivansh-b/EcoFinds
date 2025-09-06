@@ -288,7 +288,7 @@ class _MyListingsScreenState extends State<MyListingsScreen>
             children: [
               _buildStatCard(
                 'Total Value',
-                '\$${_getTotalValue().toStringAsFixed(0)}',
+                '₹${_getTotalValue().toStringAsFixed(0)}',
                 Icons.attach_money,
                 EcoColors.secondaryGreen,
               ),

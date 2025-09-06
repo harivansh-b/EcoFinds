@@ -1037,7 +1037,7 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '\${product.price.toStringAsFixed(2)}',
+                          '₹${product.price.toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: EcoColors.secondaryGreen,
                             fontWeight: FontWeight.bold,
@@ -1181,7 +1181,7 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '\${product.price.toStringAsFixed(2)}',
+                          '₹${product.price.toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: EcoColors.secondaryGreen,
                             fontWeight: FontWeight.bold,
