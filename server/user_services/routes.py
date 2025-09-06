@@ -19,30 +19,54 @@ def verify_api(request: Request):
         )
 
 @user_route.put("/createuser", dependencies=[Depends(verify_api)])
-def create_user(user: UserModel, db=Depends(get_db)):
+async def create_user(user: UserModel, db=Depends(get_db)):
     users_collection = db["user"]
-    if users_collection.find_one({"_id": user._id}):
+
+    existing_user = await users_collection.find_one({"_id": user.id})
+    print("Existing user found in DB:", existing_user)
+
+    if existing_user:
         raise HTTPException(status_code=400, detail="User already exists")
+
     user_dict = user.model_dump(by_alias=True)
-    users_collection.insert_one(user_dict)
+    print("Inserting user into DB:", user_dict)
+
+    await users_collection.insert_one(user_dict)
     return {"message": "User created successfully", "user": user_dict}
 
 
 @user_route.patch("/updateuser", dependencies=[Depends(verify_api)])
-def update_user(user: UserModel, db=Depends(get_db)):
+async def update_user(user: UserModel, db=Depends(get_db)):
     users_collection = db["user"]
-    existing_user = users_collection.find_one({"_id": user._id})
+
+    existing_user = await users_collection.find_one({"_id": user.id})
     if not existing_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user_dict = user.model_dump()
+    user_dict = user.model_dump(by_alias=True)
 
     user_dict.pop("_id", None)
 
-    users_collection.update_one(
-        {"_id": user._id},
+    await users_collection.update_one(
+        {"_id": user.id},
         {"$set": user_dict}
     )
 
-    updated_user = users_collection.find_one({"_id": user._id})
+    updated_user = await users_collection.find_one({"_id": user.id})
+
     return {"message": "User updated successfully", "user": updated_user}
+
+
+
+@user_route.get("/getuser/{user_id}", dependencies=[Depends(verify_api)])
+async def get_user(user_id: str, db=Depends(get_db)):
+    users_collection = db['user']
+    user_data = await users_collection.find_one({"_id": user_id})
+
+    if not user_data:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+    
+    return user_data
