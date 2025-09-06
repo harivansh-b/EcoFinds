@@ -640,7 +640,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => AddNewProductScreen(
           onProductAdded: _addProduct,
-          //currentUser: currentUser,
+          //currentUserId: 'USER123',
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
@@ -670,7 +670,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         builder: (context) => AddNewProductScreen(
           product: product,
           onProductAdded: _updateProduct,
-         // currentUser: currentUser,
+          //currentUserId: 'USER123',
         ),
       ),
     );

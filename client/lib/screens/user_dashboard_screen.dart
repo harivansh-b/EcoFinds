@@ -564,6 +564,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/login',
+                  (Route<dynamic> route) => false,
+                );
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: const Text('Logged out successfully'),
