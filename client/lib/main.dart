@@ -16,18 +16,20 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       initialRoute: '/login',
       routes: {
-        '/login': (context) => CleanLoginScreen(),
-        '/register': (context) => CleanRegisterScreen(),
+        '/login': (context) => const CleanLoginScreen(),
+        '/register': (context) => const CompleteRegisterScreen(),
         '/location': (context) {
-          // Get userId from arguments if passed
-          final args = ModalRoute.of(context)?.settings.arguments as String?;
-          return LocationPickerScreen(
-            userId: args ?? 'USER123',
-          );
+          // Get user data from arguments passed from login/registration
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          return const LocationPickerScreen();
         },
+        // Updated route to match LocationPickerScreen navigation
+        '/home': (context) {
+          // Get user data arguments from LocationPickerScreen
+          return const MainScreen();
+        },
+        // Keep the '/main' route as well for backward compatibility
         '/main': (context) {
-          // Simply return MainScreen without any parameters
-          // The MainScreen will handle its own state internally
           return const MainScreen();
         },
       },

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/product.dart';
 import 'product_listing_screen.dart';
 import 'my_listings_screen.dart';
@@ -7,6 +9,129 @@ import 'cart_screen.dart';
 import 'previous_purchases_screen.dart';
 import 'user_dashboard_screen.dart';
 import 'product_detail_screen.dart';
+
+// Configuration constants from LocationPickerScreen
+const String myurl = "http://127.0.0.1:8000";
+const String apiKey = "auth_api@12!_23";
+
+// User model to match your backend
+class UserData {
+  final String id;
+  final String name;
+  final String email;
+  final String? phone;
+  final String? location;
+  final double? latitude;
+  final double? longitude;
+  final DateTime? createdAt;
+
+  UserData({
+    required this.id,
+    required this.name,
+    required this.email,
+    this.phone,
+    this.location,
+    this.latitude,
+    this.longitude,
+    this.createdAt,
+  });
+
+  factory UserData.fromJson(Map<String, dynamic> json) {
+    return UserData(
+      id: json['_id'] ?? json['id'] ?? '',
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      phone: json['phone'],
+      location: json['location'],
+      latitude: json['latitude'] != null 
+          ? double.tryParse(json['latitude'].toString())
+          : null,
+      longitude: json['longitude'] != null
+          ? double.tryParse(json['longitude'].toString())
+          : null,
+      createdAt: json['createdAt'] != null 
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'location': location,
+      'latitude': latitude?.toString(),
+      'longitude': longitude?.toString(),
+      'createdAt': createdAt?.toIso8601String(),
+    };
+  }
+}
+
+// User Service for API calls
+class UserService {
+  static Future<UserData?> getUser(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse("$myurl/user/getuser/$userId"),
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final userData = jsonDecode(response.body);
+        return UserData.fromJson(userData);
+      } else if (response.statusCode == 404) {
+        throw Exception("User not found");
+      } else if (response.statusCode == 403) {
+        throw Exception("Unauthorized access - Invalid API key");
+      } else {
+        final errorBody = jsonDecode(response.body);
+        throw Exception(errorBody['detail'] ?? "Failed to fetch user data");
+      }
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception("Network error - Please check your internet connection");
+    }
+  }
+
+  static Future<UserData> updateUser(UserData userData) async {
+    try {
+      final response = await http.patch(
+        Uri.parse("$myurl/user/updateuser"),
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+        },
+        body: jsonEncode({
+          "id": userData.id,
+          "name": userData.name,
+          "email": userData.email,
+          "phone": userData.phone,
+          "location": userData.location,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        return UserData.fromJson(result['user']);
+      } else {
+        final errorBody = jsonDecode(response.body);
+        throw Exception(errorBody['detail'] ?? "Failed to update user");
+      }
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception("Network error - Please check your internet connection");
+    }
+  }
+}
 
 // EcoFinds Color Palette
 class EcoColors {
@@ -36,10 +161,16 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
 
-  // Add these variables to handle data from navigation
-  String userId = 'USER123';
-  String selectedLocation = '';
-  String enteredAddress = '';
+  // User data variables from navigation arguments
+  String? userId;
+  String? userName;
+  String? userEmail;
+  String? userPhone;
+  
+  // Current user data from API
+  UserData? currentUser;
+  bool isLoadingUser = false;
+  String? userLoadError;
 
   List<Product> products = [
     Product(
@@ -102,12 +233,27 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Get arguments from navigation if available
+    
+    // Get arguments from navigation (coming from LocationPickerScreen)
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map<String, dynamic>) {
-      userId = args['userId'] ?? 'USER123';
-      selectedLocation = args['selectedLocation'] ?? '';
-      enteredAddress = args['enteredAddress'] ?? '';
+      final String? newUserId = args['userId'];
+      final String? newUserName = args['userName'];
+      final String? newUserEmail = args['userEmail'];
+      final String? newUserPhone = args['userPhone'];
+      
+      // Only load user data if we have new user information or haven't loaded yet
+      if (newUserId != null && (userId != newUserId || currentUser == null)) {
+        setState(() {
+          userId = newUserId;
+          userName = newUserName;
+          userEmail = newUserEmail;
+          userPhone = newUserPhone;
+        });
+        
+        // Load complete user data from API
+        _loadUserData();
+      }
     }
   }
 
@@ -115,6 +261,49 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  // Load complete user data from API
+  Future<void> _loadUserData() async {
+    if (userId == null) return;
+
+    setState(() {
+      isLoadingUser = true;
+      userLoadError = null;
+    });
+
+    try {
+      final userData = await UserService.getUser(userId!);
+      if (mounted) {
+        setState(() {
+          currentUser = userData;
+          isLoadingUser = false;
+          userLoadError = null;
+        });
+        
+        if (userData != null) {
+          _showSnackBar("Welcome back, ${userData.name}!");
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoadingUser = false;
+          userLoadError = e.toString().replaceAll('Exception: ', '');
+        });
+        
+        // Show error but don't block the user experience
+        _showSnackBar(
+          "Could not load user data. Using cached information.", 
+          isError: true
+        );
+      }
+    }
+  }
+
+  // Refresh user data
+  Future<void> _refreshUserData() async {
+    await _loadUserData();
   }
 
   @override
@@ -130,21 +319,31 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
               products: products,
               onAddToCart: _addToCart,
               onProductTap: _viewProductDetails,
+              //widget.currentUser: currentUser,
             ),
             MyListingsScreen(
               products: products.where((p) => p.isOwned).toList(),
               onEdit: _editProduct,
               onDelete: _deleteProduct,
               onAddNew: () => _navigateToAddProduct(),
+              //currentUser: currentUser,
             ),
             CartScreen(
               cartItems: cartItems,
               onRemoveFromCart: _removeFromCart,
+             // currentUser: currentUser,
             ),
             PreviousPurchasesScreen(
               purchases: purchaseHistory,
+             // currentUser: currentUser,
             ),
-            const UserDashboardScreen(),
+            UserDashboardScreen(
+             // currentUser: currentUser,
+             // isLoadingUser: isLoadingUser,
+             // userLoadError: userLoadError,
+             // onRefreshUser: _refreshUserData,
+             // onUpdateUser: _updateUserData,
+            ),
           ],
         ),
         bottomNavigationBar: _buildEcoBottomNavigationBar(),
@@ -152,6 +351,39 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
     );
+  }
+
+  // Update user data
+  Future<void> _updateUserData(UserData updatedUser) async {
+    setState(() {
+      isLoadingUser = true;
+      userLoadError = null;
+    });
+
+    try {
+      final userData = await UserService.updateUser(updatedUser);
+      if (mounted) {
+        setState(() {
+          currentUser = userData;
+          isLoadingUser = false;
+          userLoadError = null;
+        });
+        
+        _showSnackBar("Profile updated successfully!");
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoadingUser = false;
+          userLoadError = e.toString().replaceAll('Exception: ', '');
+        });
+        
+        _showSnackBar(
+          "Failed to update profile: ${e.toString().replaceAll('Exception: ', '')}", 
+          isError: true
+        );
+      }
+    }
   }
 
   ThemeData _buildEcoTheme() {
@@ -181,7 +413,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(12)),
         ),
-        shadowColor: Color(0x1A2E7D32), // EcoColors.primaryGreen.withOpacity(0.1)
+        shadowColor: Color(0x1A2E7D32),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -228,9 +460,9 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       child: SafeArea(
         child: Container(
           height: 70,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), // Reduced horizontal padding
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Changed from spaceAround to spaceEvenly
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               Expanded(child: _buildNavItem(0, Icons.eco, 'Explore')),
               Expanded(child: _buildNavItem(1, Icons.inventory_2_outlined, 'My Items')),
@@ -263,10 +495,10 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           return Transform.scale(
             scale: isSelected ? _scaleAnimation.value : 1.0,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6), // Reduced padding
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               decoration: BoxDecoration(
                 color: isSelected ? EcoColors.primaryGreen.withOpacity(0.1) : Colors.transparent,
-                borderRadius: BorderRadius.circular(16), // Reduced border radius
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -276,7 +508,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                       Icon(
                         icon,
                         color: isSelected ? EcoColors.primaryGreen : EcoColors.textLight,
-                        size: 22, // Slightly smaller icon
+                        size: 22,
                       ),
                       if (badgeCount != null && badgeCount > 0)
                         Positioned(
@@ -289,14 +521,14 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                               shape: BoxShape.circle,
                             ),
                             constraints: const BoxConstraints(
-                              minWidth: 14, // Smaller badge
+                              minWidth: 14,
                               minHeight: 14,
                             ),
                             child: Text(
-                              badgeCount > 99 ? '99+' : badgeCount.toString(), // Handle large numbers
+                              badgeCount > 99 ? '99+' : badgeCount.toString(),
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 9, // Smaller font
+                                fontSize: 9,
                                 fontWeight: FontWeight.bold,
                               ),
                               textAlign: TextAlign.center,
@@ -305,17 +537,17 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 2), // Reduced spacing
+                  const SizedBox(height: 2),
                   Flexible(
                     child: Text(
                       label,
                       style: TextStyle(
                         color: isSelected ? EcoColors.primaryGreen : EcoColors.textLight,
-                        fontSize: 10, // Smaller font size
+                        fontSize: 10,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
                       textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis, // Handle text overflow
+                      overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
                   ),
@@ -331,9 +563,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   Widget _buildEcoFAB() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Use different FAB styles based on screen width
         if (constraints.maxWidth < 400) {
-          // Smaller FAB for smaller screens
           return FloatingActionButton(
             onPressed: _navigateToAddProduct,
             backgroundColor: EcoColors.secondaryGreen,
@@ -342,7 +572,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             child: const Icon(Icons.add_circle_outline, size: 24),
           );
         } else {
-          // Extended FAB for larger screens
           return FloatingActionButton.extended(
             onPressed: _navigateToAddProduct,
             backgroundColor: EcoColors.secondaryGreen,
@@ -367,30 +596,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       cartItems.add(product);
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.eco, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '${product.title} added to cart!',
-                style: const TextStyle(color: Colors.white),
-                overflow: TextOverflow.ellipsis, // Handle long product titles
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: EcoColors.secondaryGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    _showSnackBar('${product.title} added to cart!');
   }
 
   void _removeFromCart(Product product) {
@@ -398,28 +604,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       cartItems.remove(product);
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.delete_outline, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '${product.title} removed from cart',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: EcoColors.earthBrown,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+    _showSnackBar('${product.title} removed from cart', isError: true);
   }
 
   void _viewProductDetails(Product product) {
@@ -429,6 +614,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         pageBuilder: (context, animation, secondaryAnimation) => ProductDetailScreen(
           product: product,
           onAddToCart: _addToCart,
+         // currentUser: currentUser,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           const begin = Offset(1.0, 0.0);
@@ -454,6 +640,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => AddNewProductScreen(
           onProductAdded: _addProduct,
+          //currentUser: currentUser,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
@@ -473,28 +660,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       products.add(product);
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.eco, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'New eco-friendly item added!',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: EcoColors.leafGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+    _showSnackBar('New eco-friendly item added!');
   }
 
   void _editProduct(Product product) {
@@ -504,6 +670,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         builder: (context) => AddNewProductScreen(
           product: product,
           onProductAdded: _updateProduct,
+         // currentUser: currentUser,
         ),
       ),
     );
@@ -517,17 +684,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       }
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Item updated successfully!'),
-        backgroundColor: EcoColors.secondaryGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+    _showSnackBar('Item updated successfully!');
   }
 
   void _deleteProduct(Product product) {
@@ -564,6 +721,37 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             });
           },
         ),
+      ),
+    );
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.eco,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: isError ? EcoColors.errorRed : EcoColors.secondaryGreen,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

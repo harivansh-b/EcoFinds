@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
+from typing import Optional
 
 class UserModel(BaseModel):
     id: str = Field(..., alias="_id", description="id must be of type string")
@@ -13,3 +14,11 @@ class UserModel(BaseModel):
     phoneno: str = Field(..., description="phoneno must be of type string")
     profilePic: str = Field(..., description="GridFS file ObjectId as string")  
 
+class UpdateUserModel(BaseModel):
+    id: str = Field(..., alias="user_id")  # <-- required
+    address: Optional[str] = None
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
+
+    class Config:
+        populate_by_name = True  # lets you send "id" or "user_id"

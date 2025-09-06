@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from starlette.status import HTTP_403_FORBIDDEN
 from pymongo.collection import Collection
 from db.connection import get_db
-from user_services.models import UserModel
+from user_services.models import UserModel , UpdateUserModel
 import os
 
 user_route = APIRouter(prefix="/user")
@@ -36,15 +36,15 @@ async def create_user(user: UserModel, db=Depends(get_db)):
 
 
 @user_route.patch("/updateuser", dependencies=[Depends(verify_api)])
-async def update_user(user: UserModel, db=Depends(get_db)):
+async def update_user(user: UpdateUserModel, db=Depends(get_db)):
     users_collection = db["user"]
 
     existing_user = await users_collection.find_one({"_id": user.id})
     if not existing_user:
         raise HTTPException(status_code=404, detail="User not found")
-
+    
     user_dict = user.model_dump(by_alias=True)
-
+    
     user_dict.pop("_id", None)
 
     await users_collection.update_one(

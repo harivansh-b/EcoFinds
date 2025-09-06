@@ -73,6 +73,7 @@ async def login_api(request: LoginModel):
 @auth_engine.post("/email/signup", dependencies=[Depends(verify_auth_api)])
 async def signup_api(response: SignupModel):
     try:
+        print(response)
         email = response.email
         username = response.username
         existing_user = await db.user.find_one({"email": email})
@@ -137,6 +138,7 @@ async def verifyotp_api(request: OtpModel):
     try:
         email = request.email
         otp = request.otp
+        username=request.username
         
         otp_entry = await db.otp_store.find_one({"email": email, "otp": otp})
         
@@ -164,7 +166,8 @@ async def verifyotp_api(request: OtpModel):
             "success": True,
             "message": "OTP verified successfully",
             "otp": otp,
-            "email": email
+            "email": email,
+            "userid":await auth_util.generate_userid(username,db)
         }
         
     except HTTPException as he:
@@ -173,49 +176,4 @@ async def verifyotp_api(request: OtpModel):
         print(f"OTP verification error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"OTP verification failed: {str(e)}"
-        )
-
-@auth_engine.post("/email/verifyotp", dependencies=[Depends(verify_auth_api)])
-async def verifyotp_api(request: OtpModel):
-    try:
-        email = request.email
-        otp = request.otp
-        
-        otp_entry = await db.otp_store.find_one({"email": email, "otp": otp})
-        
-        if not otp_entry:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid OTP or email mismatch"
-            )
-        
-        expiry_minutes = 10
-        current_time = datetime.now(timezone.utc)
-        created_at = otp_entry["createdAt"]
-        
-        if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        
-        if (current_time - created_at).total_seconds() > expiry_minutes * 60:
-            await db.otp_store.delete_one({"email": email, "otp": otp})
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="OTP expired"
-            )
-        
-        return {
-            "success": True,
-            "message": "OTP verified successfully",
-            "otp": otp,
-            "email": email
-        }
-        
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        print(f"OTP verification error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"OTP verification failed: {str(e)}"
-        )
+            detail=f"OTP verification failed: {str(e)}")

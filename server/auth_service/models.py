@@ -45,3 +45,4 @@ class UpdatePassword(BaseModel):
 class OtpModel(BaseModel):
     email: str
     otp: str
+    username : str

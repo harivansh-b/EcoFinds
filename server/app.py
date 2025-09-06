@@ -5,9 +5,16 @@ from product_services.routes import product_route
 from media_services.routes import image_route
 from cart_services.routes import cart_route
 from browsing_services.routes import browse_engine
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or ["http://localhost:3000"] if you want to restrict
+    allow_credentials=True,
+    allow_methods=["*"],   # Allow POST, GET, OPTIONS, etc.
+    allow_headers=["*"],   # Allow custom headers like x-api-key
+)
 @app.get("/hello")
 def hello_world():
     return {
