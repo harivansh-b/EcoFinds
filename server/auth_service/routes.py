@@ -8,6 +8,7 @@ from fastapi_mail import FastMail,MessageSchema,ConnectionConfig
 from datetime import datetime,timezone
 from utils import auth_util
 from pathlib import Path
+from fastapi_mail import MessageSchema, MessageType
 
 auth_engine = APIRouter(prefix="/auth")
 
@@ -116,16 +117,28 @@ async def sendotp_api(request: EmailRequest):
 
     now = datetime.now(timezone.utc)
 
+
+    import os
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    logo_path = os.path.join(BASE_DIR, "..", "static", "images", "logo.png")
+
     message = MessageSchema(
         subject="Your OTP Code",
         recipients=[email],
         template_body={
-            "otp": otp,
-            "purpose": "To complete your signup",
-            "date": now.strftime("%d-%B-%Y")
+        "otp": otp,
+        "purpose": "To complete your signup",
+        "date": now.strftime("%d-%B-%Y")
         },
-        subtype="html"
-    )
+        subtype=MessageType.html,
+        attachments=[{
+            "file": logo_path,
+            "headers": {"Content-ID": "<logo>"}   # 👈 CID for inline
+        }]
+)
+
+
     
     fm = FastMail(mail_config)
     await fm.send_message(message, template_name="otp_template.html")

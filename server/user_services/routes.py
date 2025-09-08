@@ -70,3 +70,14 @@ async def get_user(user_id: str, db=Depends(get_db)):
         )
     
     return user_data
+
+@user_route.get("/user/{user_id}/confirmed-items", dependencies=[Depends(verify_api)])
+async def get_confirmed_items(user_id: str, db=Depends(get_db)):
+    orders_collection = db["orders"]
+
+    count = await orders_collection.count_documents({
+        "user_id": user_id,
+        "status": "confirmed"
+    })
+
+    return {"user_id": user_id, "confirmed_items": count}
