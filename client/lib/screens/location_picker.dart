@@ -4,8 +4,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
+import 'package:eco_finds/env.dart';
 
-const String myurl = "http://127.0.0.1:8000";
+final String myurl = ApiConfig.baseUrl;
 const String apiKey = "auth_api@12!_23";
 
 // EcoFinds Color Palette
@@ -26,10 +27,12 @@ class EcoColors {
 
 class LocationPickerScreen extends StatefulWidget {
   final Map<String, dynamic>? registrationData;
+  final String userId;
 
   const LocationPickerScreen({
-    super.key,
-    this.registrationData,
+    super.key, 
+    this.registrationData, 
+    required this.userId
   });
 
   @override
@@ -38,7 +41,7 @@ class LocationPickerScreen extends StatefulWidget {
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
   late final MapController _mapController;
-  LatLng _selectedLocation = LatLng(13.0827, 80.2707); // Default to Chennai
+  LatLng _selectedLocation = const LatLng(13.0827, 80.2707); // Default to Chennai
   final TextEditingController _addressController = TextEditingController();
   bool isLoading = false;
   bool isCreatingUser = false;
@@ -62,7 +65,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       final data = widget.registrationData!;
       source = data['source'] ?? 'registration';
       isExistingUser = data['isExistingUser'] ?? false;
-      
+
       if (source == 'registration') {
         userId = data['user_id'];
         username = data['username'];
@@ -72,37 +75,43 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         username = data['username'];
         email = data['email'];
       }
-      
+
       print("Widget data - Source: $source, User ID: $userId, Email: $email");
+    } else {
+      // Fallback to widget.userId if no registrationData
+      userId = widget.userId;
     }
-    
+
     // Then try to get data from route arguments (login flow or fallback)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final routeArgs = ModalRoute.of(context)?.settings.arguments;
-      
+
       if (routeArgs != null && routeArgs is Map<String, dynamic>) {
         final data = routeArgs;
-        
+
         // Update values from route arguments (this takes precedence)
         source = data['source'] ?? source;
         isExistingUser = data['isExistingUser'] ?? isExistingUser;
-        
+
         // Handle both naming conventions
         userId = data['userId'] ?? data['user_id'] ?? userId;
         username = data['username'] ?? username;
         email = data['email'] ?? email;
-        
+
         print("Route args - Source: $source, User ID: $userId, Email: $email");
-        
+
         // Trigger rebuild with new data
         if (mounted) {
           setState(() {});
         }
       }
-      
+
       // Final validation
-      if (userId == null || email == null) {
-        print("ERROR: Missing essential data - User ID: $userId, Email: $email");
+      if (userId == null || userId!.isEmpty) {
+        print("ERROR: Missing User ID");
+        if (mounted) {
+          _showSnackBar("User ID not found. Please try again.", isError: true);
+        }
       } else {
         print("SUCCESS: Data initialized - Source: $source, User ID: $userId, Email: $email");
       }
@@ -116,33 +125,36 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   }
 
   Future<void> _getUserLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (!mounted) return;
-      _showSnackBar("Location services are disabled.", isError: true);
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        if (!mounted) return;
-        _showSnackBar("Location permission denied.", isError: true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          _showSnackBar("Location services are disabled.", isError: true);
+        }
         return;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      if (!mounted) return;
-      _showSnackBar("Location permission permanently denied. Please enable it from app settings.", isError: true);
-      return;
-    }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            _showSnackBar("Location permission denied.", isError: true);
+          }
+          return;
+        }
+      }
 
-    try {
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          _showSnackBar(
+            "Location permission permanently denied. Please enable it from app settings.",
+            isError: true,
+          );
+        }
+        return;
+      }
+
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
@@ -150,13 +162,17 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
       LatLng userLatLng = LatLng(position.latitude, position.longitude);
 
-      setState(() {
-        _selectedLocation = userLatLng;
-      });
+      if (mounted) {
+        setState(() {
+          _selectedLocation = userLatLng;
+        });
 
-      _mapController.move(userLatLng, 14.0);
+        _mapController.move(userLatLng, 14.0);
+      }
     } catch (e) {
-      _showSnackBar("Error getting location: ${e.toString()}", isError: true);
+      if (mounted) {
+        _showSnackBar("Error getting location: ${e.toString()}", isError: true);
+      }
     }
   }
 
@@ -170,7 +186,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     final String? hashedPassword = widget.registrationData!['hashed_password'];
     final String? phone = widget.registrationData!['phone'];
 
-    if (username == null || email == null || hashedPassword == null || userId == null) {
+    if (username == null ||
+        email == null ||
+        hashedPassword == null ||
+        userId == null) {
       _showSnackBar("Missing essential registration data.", isError: true);
       return false;
     }
@@ -181,10 +200,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       // Create user in database
       final response = await http.put(
         Uri.parse("$myurl/user/createuser"),
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-        },
+        headers: {"Content-Type": "application/json", "x-api-key": apiKey},
         body: jsonEncode({
           "_id": userId,
           "name": username,
@@ -202,19 +218,30 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['message'] != null) {
-          _showSnackBar("Registration completed successfully! Welcome to EcoFinds!");
+          _showSnackBar(
+            "Registration completed successfully! Welcome to EcoFinds!",
+          );
           return true;
         } else {
-          _showSnackBar(data['detail'] ?? data['message'] ?? "Registration failed", isError: true);
+          _showSnackBar(
+            data['detail'] ?? data['message'] ?? "Registration failed",
+            isError: true,
+          );
           return false;
         }
       } else {
         final errorData = jsonDecode(response.body);
-        _showSnackBar("Registration failed: ${errorData['detail'] ?? errorData['message'] ?? response.statusCode}", isError: true);
+        _showSnackBar(
+          "Registration failed: ${errorData['detail'] ?? errorData['message'] ?? response.statusCode}",
+          isError: true,
+        );
         return false;
       }
     } catch (e) {
-      _showSnackBar("Network error during registration: ${e.toString()}", isError: true);
+      _showSnackBar(
+        "Network error during registration: ${e.toString()}",
+        isError: true,
+      );
       return false;
     } finally {
       if (mounted) {
@@ -235,10 +262,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
       final response = await http.patch(
         Uri.parse("$myurl/user/updateuser"),
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-        },
+        headers: {"Content-Type": "application/json", "x-api-key": apiKey},
         body: jsonEncode({
           "user_id": userId,
           "address": _addressController.text.trim(),
@@ -253,16 +277,25 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           _showSnackBar("Address updated successfully!");
           return true;
         } else {
-          _showSnackBar(data['detail'] ?? data['message'] ?? "Failed to update address", isError: true);
+          _showSnackBar(
+            data['detail'] ?? data['message'] ?? "Failed to update address",
+            isError: true,
+          );
           return false;
         }
       } else {
         final errorData = jsonDecode(response.body);
-        _showSnackBar("Failed to update address: ${errorData['detail'] ?? errorData['message'] ?? response.statusCode}", isError: true);
+        _showSnackBar(
+          "Failed to update address: ${errorData['detail'] ?? errorData['message'] ?? response.statusCode}",
+          isError: true,
+        );
         return false;
       }
     } catch (e) {
-      _showSnackBar("Network error while updating address: ${e.toString()}", isError: true);
+      _showSnackBar(
+        "Network error while updating address: ${e.toString()}",
+        isError: true,
+      );
       return false;
     } finally {
       if (mounted) {
@@ -277,7 +310,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       return;
     }
 
-    if (userId == null) {
+    if (userId == null || userId!.isEmpty) {
       _showSnackBar("User ID not found. Please try again.", isError: true);
       return;
     }
@@ -294,7 +327,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         // Existing user login - update address
         success = await updateUserAddress();
       } else {
-        _showSnackBar("Invalid navigation source. Please try again.", isError: true);
+        _showSnackBar(
+          "Invalid navigation source. Please try again.",
+          isError: true,
+        );
         return;
       }
 
@@ -304,17 +340,17 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
         // Navigate to main screen
         if (!mounted) return;
-        
-        String welcomeMessage = source == 'registration' 
-            ? 'Welcome to EcoFinds!' 
+
+        String welcomeMessage = source == 'registration'
+            ? 'Welcome to EcoFinds!'
             : 'Location updated successfully!';
-        
+
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/main',
           (Route<dynamic> route) => false,
           arguments: {
-            'user_id': userId,
+            'userId': userId, // Changed from 'user_id' to match main.dart expectation
             'username': username,
             'email': email,
             'welcome_message': welcomeMessage,
@@ -323,7 +359,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         );
       }
     } catch (e) {
-      _showSnackBar("An unexpected error occurred: ${e.toString()}", isError: true);
+      _showSnackBar(
+        "An unexpected error occurred: ${e.toString()}",
+        isError: true,
+      );
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
@@ -343,7 +382,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     print("Email: $email");
     print("Name: $username");
     print("Address: ${_addressController.text}");
-    print("Location: Lat ${_selectedLocation.latitude}, Lng ${_selectedLocation.longitude}");
+    print(
+      "Location: Lat ${_selectedLocation.latitude}, Lng ${_selectedLocation.longitude}",
+    );
     print("Source: $source");
   }
 
@@ -353,7 +394,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? EcoColors.errorRed : EcoColors.secondaryGreen,
+        backgroundColor: isError
+            ? EcoColors.errorRed
+            : EcoColors.secondaryGreen,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 3),
         action: isError
@@ -373,8 +416,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     if (source == 'registration') {
       return "Complete Registration";
     } else if (source == 'login') {
-      return isExistingUser 
-          ? "Update Delivery Location" 
+      return isExistingUser
+          ? "Update Delivery Location"
           : "Set Delivery Location";
     }
     return "Select Delivery Location";
@@ -384,7 +427,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     if (source == 'registration') {
       return "Complete your registration by selecting your delivery location";
     } else if (source == 'login') {
-      return isExistingUser 
+      return isExistingUser
           ? "Update your delivery location for better service"
           : "Set your delivery location to get started";
     }
@@ -464,7 +507,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 Row(
                   children: [
                     Icon(
-                      source == 'registration' 
+                      source == 'registration'
                           ? Icons.person_add_outlined
                           : Icons.location_on_outlined,
                       color: EcoColors.leafGreen,
@@ -474,7 +517,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     Expanded(
                       child: Text(
                         _getInstructions(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: EcoColors.textDark,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -498,7 +541,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       const SizedBox(width: 8),
                       Text(
                         _getLoadingText(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: EcoColors.textLight,
                           fontSize: 12,
                         ),
@@ -523,12 +566,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       setState(() {
                         _selectedLocation = point;
                       });
-                      _mapController.move(point, _mapController.zoom);
+                      _mapController.move(point, _mapController.camera.zoom);
                     },
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                      urlTemplate:
+                          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                       subdomains: const ['a', 'b', 'c'],
                       userAgentPackageName: 'com.example.ecofinds',
                     ),
@@ -544,7 +588,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: EcoColors.primaryGreen.withOpacity(0.4),
+                                  color: EcoColors.primaryGreen.withOpacity(
+                                    0.4,
+                                  ),
                                   spreadRadius: 3,
                                   blurRadius: 10,
                                   offset: const Offset(0, 3),
@@ -581,7 +627,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       ],
                     ),
                     child: IconButton(
-                      icon: Icon(
+                      icon: const Icon(
                         Icons.my_location,
                         color: EcoColors.secondaryGreen,
                       ),
@@ -599,8 +645,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [EcoColors.primaryGreen, EcoColors.secondaryGreen],
+                          gradient: const LinearGradient(
+                            colors: [
+                              EcoColors.primaryGreen,
+                              EcoColors.secondaryGreen,
+                            ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -618,8 +667,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           icon: const Icon(Icons.add, color: Colors.white),
                           onPressed: () {
                             _mapController.move(
-                              _mapController.center,
-                              _mapController.zoom + 1,
+                              _mapController.camera.center,
+                              _mapController.camera.zoom + 1,
                             );
                           },
                         ),
@@ -627,8 +676,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       const SizedBox(height: 8),
                       Container(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [EcoColors.primaryGreen, EcoColors.secondaryGreen],
+                          gradient: const LinearGradient(
+                            colors: [
+                              EcoColors.primaryGreen,
+                              EcoColors.secondaryGreen,
+                            ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -646,8 +698,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           icon: const Icon(Icons.remove, color: Colors.white),
                           onPressed: () {
                             _mapController.move(
-                              _mapController.center,
-                              _mapController.zoom - 1,
+                              _mapController.camera.center,
+                              _mapController.camera.zoom - 1,
                             );
                           },
                         ),
@@ -697,7 +749,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 // Section Header
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.location_on,
                       color: EcoColors.secondaryGreen,
                       size: 24,
@@ -718,16 +770,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 if (email != null) ...[
                   const SizedBox(height: 8),
                   Text(
-                    source == 'registration' 
+                    source == 'registration'
                         ? "Creating account for: $email"
                         : "Updating location for: $email",
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
                       color: EcoColors.textLight,
                       fontStyle: FontStyle.italic,
                     ),
                   ),
-                ] else ...[
+                ] else if (userId == null || userId!.isEmpty) ...[
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -740,13 +792,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.warning_amber_rounded,
                           color: EcoColors.errorRed,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
-                        Expanded(
+                        const Expanded(
                           child: Text(
                             "No user data found. Please go back and try again.",
                             style: TextStyle(
@@ -781,8 +833,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     maxLines: 2,
                     decoration: InputDecoration(
                       hintText: "Enter your complete address with landmarks...",
-                      hintStyle: TextStyle(color: EcoColors.textLight),
-                      prefixIcon: Icon(
+                      hintStyle: const TextStyle(color: EcoColors.textLight),
+                      prefixIcon: const Icon(
                         Icons.home_outlined,
                         color: EcoColors.secondaryGreen,
                       ),
@@ -790,18 +842,25 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       fillColor: EcoColors.backgroundWhite,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: EcoColors.accentGreen.withOpacity(0.3)),
+                        borderSide: BorderSide(
+                          color: EcoColors.accentGreen.withOpacity(0.3),
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: EcoColors.accentGreen.withOpacity(0.3)),
+                        borderSide: BorderSide(
+                          color: EcoColors.accentGreen.withOpacity(0.3),
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: EcoColors.secondaryGreen, width: 2),
+                        borderSide: const BorderSide(
+                          color: EcoColors.secondaryGreen,
+                          width: 2,
+                        ),
                       ),
                     ),
-                    style: TextStyle(color: EcoColors.textDark),
+                    style: const TextStyle(color: EcoColors.textDark),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -811,29 +870,38 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   width: double.infinity,
                   height: 56,
                   decoration: BoxDecoration(
-                    gradient: (userId != null && email != null) 
-                        ? LinearGradient(
-                            colors: [EcoColors.primaryGreen, EcoColors.secondaryGreen],
+                    gradient: (userId != null && userId!.isNotEmpty)
+                        ? const LinearGradient(
+                            colors: [
+                              EcoColors.primaryGreen,
+                              EcoColors.secondaryGreen,
+                            ],
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                           )
                         : null,
-                    color: (userId == null || email == null) ? EcoColors.textLight : null,
+                    color: (userId == null || userId!.isEmpty)
+                        ? EcoColors.textLight
+                        : null,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: (userId != null && email != null) 
+                    boxShadow: (userId != null && userId!.isNotEmpty)
                         ? [
                             BoxShadow(
                               color: EcoColors.primaryGreen.withOpacity(0.3),
                               spreadRadius: 1,
                               blurRadius: 8,
                               offset: const Offset(0, 4),
-                            )
+                            ),
                           ]
                         : null,
                   ),
                   child: ElevatedButton(
-                    onPressed: (isLoading || isCreatingUser || userId == null || email == null) 
-                        ? null 
+                    onPressed:
+                        (isLoading ||
+                            isCreatingUser ||
+                            userId == null ||
+                            userId!.isEmpty)
+                        ? null
                         : saveAddress,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
@@ -875,10 +943,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                   color: Colors.white,
                                 ),
                               ),
-                              if (userId != null && email != null) ...[
+                              if (userId != null && userId!.isNotEmpty) ...[
                                 const SizedBox(width: 8),
                                 Icon(
-                                  source == 'registration' 
+                                  source == 'registration'
                                       ? Icons.check_circle_outline
                                       : Icons.location_on_outlined,
                                   color: Colors.white,

@@ -2,8 +2,9 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from starlette.status import HTTP_403_FORBIDDEN
 from pymongo.collection import Collection
 from db.connection import get_db
-from user_services.models import UserModel , UpdateUserModel
+from user_services.models import UserModel , UpdateUserModel , UpdatePasswordModel
 import os
+from utils.auth_util import verify_password , get_password_hash 
 
 user_route = APIRouter(prefix="/user")
 
@@ -43,7 +44,7 @@ async def update_user(user: UpdateUserModel, db=Depends(get_db)):
     if not existing_user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    user_dict = user.model_dump(by_alias=True)
+    user_dict = user.model_dump(by_alias=True, exclude_unset=True, exclude_none=True)
     
     user_dict.pop("_id", None)
 
@@ -81,3 +82,29 @@ async def get_confirmed_items(user_id: str, db=Depends(get_db)):
     })
 
     return {"user_id": user_id, "confirmed_items": count}
+
+@user_route.patch("/update-password", dependencies=[Depends(verify_api)])
+async def update_password(data: UpdatePasswordModel, db=Depends(get_db)):
+    users_collection = db["user"]
+
+    user = await users_collection.find_one({"_id": data.user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    stored_password = user.get("pwd")
+    if not stored_password:
+        raise HTTPException(status_code=400, detail="User has no password set")
+
+    # Verify old password using bcrypt
+    if not verify_password(data.current_password, stored_password):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+
+    # Hash new password
+    hashed_password = get_password_hash(data.new_password)
+
+    await users_collection.update_one(
+        {"_id": data.user_id},
+        {"$set": {"pwd": hashed_password}}
+    )
+
+    return {"message": "Password updated successfully"}

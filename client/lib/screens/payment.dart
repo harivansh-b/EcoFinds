@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
+import 'package:eco_finds/env.dart';
+
+final String myurl = ApiConfig.baseUrl;
+
 // EcoFinds Color Palette (matching your main screen)
 class EcoColors {
   static const Color primaryGreen = Color(0xFF2E7D32);      // Deep forest green

@@ -19,6 +19,15 @@ class UpdateUserModel(BaseModel):
     address: Optional[str] = None
     latitude: Optional[str] = None
     longitude: Optional[str] = None
+    name : Optional[str] = None
+    email : Optional[EmailStr] = None
+    location : Optional[str] = None
+    phoneno : Optional[str] = None
 
     class Config:
         populate_by_name = True  # lets you send "id" or "user_id"
+        
+class UpdatePasswordModel(BaseModel):
+    user_id: str
+    current_password: str
+    new_password: str

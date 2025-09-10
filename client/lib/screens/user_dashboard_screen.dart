@@ -1,5 +1,13 @@
 import 'package:eco_finds/screens/settings.dart';
+import 'package:eco_finds/widgets/profile_picture.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+import 'package:eco_finds/env.dart';
+
+final String myurl = ApiConfig.baseUrl;
+final String apiKey = "auth_api@12!_23";
 
 // EcoFinds Color Palette
 class EcoColors {
@@ -18,22 +26,103 @@ class EcoColors {
 }
 
 class UserDashboardScreen extends StatefulWidget {
-  const UserDashboardScreen({super.key});
+  final String userId;
+  
+  const UserDashboardScreen({super.key, required this.userId});
 
   @override
   State<UserDashboardScreen> createState() => _UserDashboardScreenState();
 }
 
 class _UserDashboardScreenState extends State<UserDashboardScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController(text: 'John Doe');
-  final _emailController = TextEditingController(text: 'john.doe@email.com');
-  final _phoneController = TextEditingController(text: '+1 234 567 8900');
-  final _addressController = TextEditingController(text: '123 Main St, City, State');
-  bool _isEditing = false;
+  Map<String, dynamic>? userData;
+  int confirmedItemsCount = 0;
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      setState(() {
+        isLoading = true;
+        errorMessage = null;
+      });
+
+      // Fetch user data and confirmed items count concurrently
+      final results = await Future.wait([
+        _fetchUserData(),
+        _fetchConfirmedItemsCount(),
+      ]);
+
+      setState(() {
+        userData = results[0] as Map<String, dynamic>?;
+        confirmedItemsCount = results[1] as int;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        errorMessage = e.toString();
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchUserData() async {
+    final url = '$myurl/user/getuser/${widget.userId}';
+    
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'x-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data;
+      } else if (response.statusCode == 404) {
+        throw Exception('User not found');
+      } else {
+        throw Exception('Failed to load user data. Status: ${response.statusCode}, Body: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<int> _fetchConfirmedItemsCount() async {
+    final url = '$myurl/user/user/${widget.userId}/confirmed-items';
+     
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'x-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['confirmed_items'] ?? 0;
+      } else {
+        return 0; // Return 0 if failed to fetch
+      }
+    } catch (e) {
+      return 0; // Return 0 on exception
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    
     return Scaffold(
       backgroundColor: EcoColors.backgroundWhite,
       appBar: AppBar(
@@ -55,420 +144,332 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ),
         ),
         elevation: 0,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              icon: Icon(_isEditing ? Icons.save : Icons.edit),
-              color: Colors.white,
-              onPressed: () {
-                if (_isEditing && _formKey.currentState!.validate()) {
-                  setState(() {
-                    _isEditing = false;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Profile updated successfully!'),
-                      backgroundColor: EcoColors.secondaryGreen,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                } else {
-                  setState(() {
-                    _isEditing = !_isEditing;
-                  });
-                }
-              },
-            ),
-          ),
-        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              // Profile Section
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: EcoColors.cardBackground,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: EcoColors.primaryGreen.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Profile Image with edit indicator
-                    Stack(
-                      children: [
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: EcoColors.secondaryGreen,
+              ),
+            )
+          : errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: EcoColors.errorRed,
+                        size: 64,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Error: $errorMessage',
+                        style: const TextStyle(
+                          color: EcoColors.errorRed,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadUserData,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: EcoColors.secondaryGreen,
+                        ),
+                        child: const Text(
+                          'Retry',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadUserData,
+                  color: EcoColors.secondaryGreen,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [                    
+                        // Profile Section
                         Container(
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [EcoColors.primaryGreen, EcoColors.secondaryGreen],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            color: EcoColors.cardBackground,
+                            borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: EcoColors.primaryGreen.withOpacity(0.3),
-                                spreadRadius: 3,
+                                color: EcoColors.primaryGreen.withOpacity(0.1),
+                                spreadRadius: 2,
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               )
                             ],
                           ),
-                          child: const CircleAvatar(
-                            radius: 50,
-                            backgroundColor: Colors.transparent,
-                            child: Icon(
-                              Icons.person,
-                              size: 50,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        if (_isEditing)
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: EcoColors.skyBlue,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // User name display
-                    if (!_isEditing) ...[
-                      Text(
-                        _nameController.text,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: EcoColors.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Eco Enthusiast',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: EcoColors.textLight,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Form Fields Container
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: EcoColors.cardBackground,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: EcoColors.primaryGreen.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Section Title
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person_outline,
-                          color: EcoColors.secondaryGreen,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Personal Information',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: EcoColors.textDark,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Name Field
-                    _buildTextFormField(
-                      controller: _nameController,
-                      label: 'Full Name',
-                      icon: Icons.person,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your name';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Email Field
-                    _buildTextFormField(
-                      controller: _emailController,
-                      label: 'Email Address',
-                      icon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!value.contains('@')) {
-                          return 'Please enter a valid email';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Phone Field
-                    _buildTextFormField(
-                      controller: _phoneController,
-                      label: 'Phone Number',
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your phone number';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Address Field
-                    _buildTextFormField(
-                      controller: _addressController,
-                      label: 'Address',
-                      icon: Icons.location_on_outlined,
-                      maxLines: 2,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your address';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Statistics Section (when not editing)
-              if (!_isEditing) ...[
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: EcoColors.warmBeige,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: EcoColors.accentGreen.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.analytics_outlined,
-                            color: EcoColors.leafGreen,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Your Eco Impact',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: EcoColors.textDark,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      
-                      // Stats Grid
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          return Wrap(
-                            spacing: 16,
-                            runSpacing: 16,
+                          child: Column(
                             children: [
-                              _buildStatCard('Items Listed', '12', Icons.inventory_2_outlined, constraints.maxWidth),
-                              _buildStatCard('Items Sold', '8', Icons.sell_outlined, constraints.maxWidth),
-                              _buildStatCard('CO₂ Saved', '2.4kg', Icons.eco_outlined, constraints.maxWidth),
+                              // Profile Image
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: EcoColors.primaryGreen.withOpacity(0.3),
+                                      spreadRadius: 3,
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    )
+                                  ],
+                                ),
+                                child: ProfilePicture(
+                                  userName: userData?['name'] ?? 'User',
+                                  size: 100,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              
+                              // User name display
+                              Text(
+                                userData?['name'] ?? 'Unknown User',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: EcoColors.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
                             ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-              
-              // Action Buttons
-              if (!_isEditing) ...[
-                // Settings Button - UPDATED WITH NAVIGATION
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Navigate to Settings Screen
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const SettingsScreen(),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: EcoColors.cardBackground,
-                      foregroundColor: EcoColors.secondaryGreen,
-                      side: const BorderSide(color: EcoColors.secondaryGreen),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.settings_outlined),
-                        SizedBox(width: 8),
-                        Text(
-                          'Settings',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                
-                // Logout Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: OutlinedButton(
-                    onPressed: _showLogoutDialog,
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: EcoColors.errorRed),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.logout,
-                          color: EcoColors.errorRed,
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          'Logout',
-                          style: TextStyle(
-                            color: EcoColors.errorRed,
-                            fontWeight: FontWeight.bold,
                           ),
                         ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Personal Information Container
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: EcoColors.cardBackground,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: EcoColors.primaryGreen.withOpacity(0.1),
+                                spreadRadius: 2,
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              )
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Section Title
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.person_outline,
+                                    color: EcoColors.secondaryGreen,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Personal Information',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: EcoColors.textDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              
+                              // Information Display Fields
+                              _buildInfoField('Full Name', userData?['name'] ?? 'N/A', Icons.person),
+                              const SizedBox(height: 16),
+                              _buildInfoField('Email Address', userData?['email'] ?? 'N/A', Icons.email_outlined),
+                              const SizedBox(height: 16),
+                              _buildInfoField('Phone Number', userData?['phoneno'] ?? 'N/A', Icons.phone_outlined),
+                              const SizedBox(height: 16),
+                              _buildInfoField('Address', userData?['address'] ?? 'N/A', Icons.location_on_outlined),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Statistics Section
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: EcoColors.warmBeige,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: EcoColors.accentGreen.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.analytics_outlined,
+                                    color: EcoColors.leafGreen,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Your Eco Impact',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: EcoColors.textDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              
+                              // Stats Grid
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return Wrap(
+                                    spacing: 16,
+                                    runSpacing: 16,
+                                    children: [
+                                      _buildStatCard('Items Listed', '${userData?['itemsListed'] ?? 0}', Icons.inventory_2_outlined, constraints.maxWidth),
+                                      _buildStatCard('Items Sold', '$confirmedItemsCount', Icons.sell_outlined, constraints.maxWidth),
+                                      _buildStatCard('CO₂ Saved', '${(confirmedItemsCount * 0.3).toStringAsFixed(1)}kg', Icons.eco_outlined, constraints.maxWidth),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Action Buttons
+                        // Settings Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () async{
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => SettingsScreen(userId: widget.userId,),
+                                ),                                
+                              );                              
+                              // Reload user data when coming back
+                              _loadUserData();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: EcoColors.cardBackground,
+                              foregroundColor: EcoColors.secondaryGreen,
+                              side: const BorderSide(color: EcoColors.secondaryGreen),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.settings_outlined),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Settings',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        
+                        // Logout Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton(
+                            onPressed: _showLogoutDialog,
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: EcoColors.errorRed),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.logout,
+                                  color: EcoColors.errorRed,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Logout',
+                                  style: TextStyle(
+                                    color: EcoColors.errorRed,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
                 ),
-              ],
-              
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildTextFormField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      enabled: _isEditing,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(
-          icon,
-          color: _isEditing ? EcoColors.secondaryGreen : EcoColors.textLight,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: EcoColors.accentGreen.withOpacity(0.3)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: EcoColors.accentGreen.withOpacity(0.3)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: EcoColors.secondaryGreen, width: 2),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: EcoColors.textLight.withOpacity(0.2)),
-        ),
-        filled: true,
-        fillColor: _isEditing ? EcoColors.cardBackground : EcoColors.backgroundWhite,
-        labelStyle: TextStyle(
-          color: _isEditing ? EcoColors.secondaryGreen : EcoColors.textLight,
-        ),
+  Widget _buildInfoField(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: EcoColors.backgroundWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: EcoColors.accentGreen.withOpacity(0.3)),
       ),
-      style: TextStyle(
-        color: EcoColors.textDark,
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: EcoColors.textLight,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: EcoColors.textLight,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: EcoColors.textDark,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-      validator: validator,
     );
   }
 
@@ -592,14 +593,4 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
     );
   }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _addressController.dispose();
-    super.dispose();
-  }
 }
-

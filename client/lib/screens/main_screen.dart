@@ -10,8 +10,9 @@ import 'previous_purchases_screen.dart';
 import 'user_dashboard_screen.dart';
 import 'product_detail_screen.dart';
 
-// Configuration constants from LocationPickerScreen
-const String myurl = "http://127.0.0.1:8000";
+import 'package:eco_finds/env.dart';
+
+final String myurl = ApiConfig.baseUrl;
 const String apiKey = "auth_api@12!_23";
 
 // User model to match your backend
@@ -150,7 +151,12 @@ class EcoColors {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final String userId; // Make userId required
+  
+  const MainScreen({
+    super.key,
+    required this.userId,
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -161,8 +167,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
 
-  // User data variables from navigation arguments
-  String? userId;
+  // User data variables
   String? userName;
   String? userEmail;
   String? userPhone;
@@ -228,32 +233,30 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
+    
+    // Load user data immediately when the screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserData();
+    });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     
-    // Get arguments from navigation (coming from LocationPickerScreen)
+    // Get any additional arguments from navigation
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map<String, dynamic>) {
-      final String? newUserId = args['userId'];
       final String? newUserName = args['userName'];
       final String? newUserEmail = args['userEmail'];
       final String? newUserPhone = args['userPhone'];
       
-      // Only load user data if we have new user information or haven't loaded yet
-      if (newUserId != null && (userId != newUserId || currentUser == null)) {
-        setState(() {
-          userId = newUserId;
-          userName = newUserName;
-          userEmail = newUserEmail;
-          userPhone = newUserPhone;
-        });
-        
-        // Load complete user data from API
-        _loadUserData();
-      }
+      // Update cached user info if provided
+      setState(() {
+        if (newUserName != null) userName = newUserName;
+        if (newUserEmail != null) userEmail = newUserEmail;
+        if (newUserPhone != null) userPhone = newUserPhone;
+      });
     }
   }
 
@@ -265,7 +268,12 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   // Load complete user data from API
   Future<void> _loadUserData() async {
-    if (userId == null) return;
+    if (widget.userId.isEmpty) {
+      setState(() {
+        userLoadError = "User ID is required";
+      });
+      return;
+    }
 
     setState(() {
       isLoadingUser = true;
@@ -273,12 +281,19 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     });
 
     try {
-      final userData = await UserService.getUser(userId!);
+      final userData = await UserService.getUser(widget.userId);
       if (mounted) {
         setState(() {
           currentUser = userData;
           isLoadingUser = false;
           userLoadError = null;
+          
+          // Update cached user info
+          if (userData != null) {
+            userName = userData.name;
+            userEmail = userData.email;
+            userPhone = userData.phone;
+          }
         });
         
         if (userData != null) {
@@ -306,8 +321,84 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     await _loadUserData();
   }
 
+  // Get current userId - always returns the required userId
+  String get currentUserId => widget.userId;
+
   @override
   Widget build(BuildContext context) {
+    // Show loading screen if user data is being loaded for the first time
+    if (isLoadingUser && currentUser == null) {
+      return Theme(
+        data: _buildEcoTheme(),
+        child: Scaffold(
+          backgroundColor: EcoColors.backgroundWhite,
+          body: const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  color: EcoColors.primaryGreen,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  "Loading your eco-friendly profile...",
+                  style: TextStyle(
+                    color: EcoColors.textDark,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Show error screen if userId is missing or invalid
+    if (userLoadError != null && currentUser == null && currentUserId.isEmpty) {
+      return Theme(
+        data: _buildEcoTheme(),
+        child: Scaffold(
+          backgroundColor: EcoColors.backgroundWhite,
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: EcoColors.errorRed,
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Unable to load user profile",
+                  style: TextStyle(
+                    color: EcoColors.textDark,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  userLoadError ?? "User ID is required",
+                  style: TextStyle(
+                    color: EcoColors.textLight,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: _loadUserData,
+                  child: const Text("Retry"),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Theme(
       data: _buildEcoTheme(),
       child: Scaffold(
@@ -319,7 +410,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
               products: products,
               onAddToCart: _addToCart,
               onProductTap: _viewProductDetails,
-              //widget.currentUser: currentUser,
+             // currentUser: currentUser,
+              //userId: currentUserId,
             ),
             MyListingsScreen(
               products: products.where((p) => p.isOwned).toList(),
@@ -327,23 +419,23 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
               onDelete: _deleteProduct,
               onAddNew: () => _navigateToAddProduct(),
               //currentUser: currentUser,
+             // userId: currentUserId,
             ),
             CartScreen(
               cartItems: cartItems,
               onRemoveFromCart: _removeFromCart,
-             // currentUser: currentUser,
+              //currentUser: currentUser,
+              //userId: currentUserId,
             ),
             PreviousPurchasesScreen(
               purchases: purchaseHistory,
-             // currentUser: currentUser,
+              //currentUser: currentUser,
+              //userId: currentUserId,
             ),
             UserDashboardScreen(
-             // currentUser: currentUser,
-             // isLoadingUser: isLoadingUser,
-             // userLoadError: userLoadError,
-             // onRefreshUser: _refreshUserData,
-             // onUpdateUser: _updateUserData,
-            ),
+              userId: currentUserId,
+              //currentUser: currentUser,
+            )
           ],
         ),
         bottomNavigationBar: _buildEcoBottomNavigationBar(),
@@ -614,7 +706,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         pageBuilder: (context, animation, secondaryAnimation) => ProductDetailScreen(
           product: product,
           onAddToCart: _addToCart,
-         // currentUser: currentUser,
+          //currentUser: currentUser,
+          //userId: currentUserId,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           const begin = Offset(1.0, 0.0);
@@ -640,7 +733,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => AddNewProductScreen(
           onProductAdded: _addProduct,
-          //currentUserId: 'USER123',
+          //currentUserId: currentUserId,
+          //currentUser: currentUser,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
@@ -670,7 +764,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         builder: (context) => AddNewProductScreen(
           product: product,
           onProductAdded: _updateProduct,
-          //currentUserId: 'USER123',
+          //currentUserId: currentUserId,
+          //currentUser: currentUser,
         ),
       ),
     );

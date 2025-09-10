@@ -3,8 +3,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'register.dart';
 
-// Update this with your actual API URL
-const String myurl = "http://127.0.0.1:8000";
+import 'package:eco_finds/env.dart';
+
+final String myurl = ApiConfig.baseUrl;
 const String apiKey = "auth_api@12!_23";
 
 // EcoFinds Color Palette
@@ -25,7 +26,7 @@ class EcoColors {
 
 // API Service Class
 class AuthService {
-  static const String baseUrl = myurl;
+  static final String baseUrl = myurl;
   static const String authApiKey = apiKey;
 
   static Future<Map<String, dynamic>> login(String email, String password) async {

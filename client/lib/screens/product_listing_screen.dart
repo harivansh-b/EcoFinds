@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
 
+import 'package:eco_finds/env.dart';
+
+final String myurl = ApiConfig.baseUrl;
+
 // EcoFinds Color Palette
 class EcoColors {
-  static const Color primaryGreen = Color(0xFF2E7D32);      // Deep forest green
-  static const Color secondaryGreen = Color(0xFF4CAF50);    // Fresh green
-  static const Color accentGreen = Color(0xFF81C784);       // Light green
-  static const Color earthBrown = Color(0xFF5D4037);        // Earth brown
-  static const Color warmBeige = Color(0xFFF1F8E9);         // Warm beige
-  static const Color leafGreen = Color(0xFF66BB6A);         // Leaf green
-  static const Color skyBlue = Color(0xFF03DAC6);           // Eco teal
-  static const Color backgroundWhite = Color(0xFFFAFAFA);   // Soft white
-  static const Color textDark = Color(0xFF1B5E20);          // Dark green text
-  static const Color textLight = Color(0xFF757575);         // Light grey text
+  static const Color primaryGreen = Color(0xFF2E7D32);
+  static const Color secondaryGreen = Color(0xFF4CAF50);
+  static const Color accentGreen = Color(0xFF81C784);
+  static const Color earthBrown = Color(0xFF5D4037);
+  static const Color warmBeige = Color(0xFFF1F8E9);
+  static const Color leafGreen = Color(0xFF66BB6A);
+  static const Color skyBlue = Color(0xFF03DAC6);
+  static const Color backgroundWhite = Color(0xFFFAFAFA);
+  static const Color textDark = Color(0xFF1B5E20);
+  static const Color textLight = Color(0xFF757575);
   static const Color cardBackground = Colors.white;
   static const Color errorRed = Color(0xFFE53935);
 }
@@ -43,10 +47,10 @@ class _ProductListingScreenState extends State<ProductListingScreen>
   // Advanced filter variables
   RangeValues priceRange = const RangeValues(0, 1000);
   double maxPrice = 1000;
-  String sortBy = 'relevance'; // relevance, price_low, price_high, date_new, date_old, distance
-  double maxDistance = 50; // in km
+  String sortBy = 'relevance';
+  double maxDistance = 50;
   double selectedDistance = 50;
-  String dateFilter = 'all'; // all, today, week, month, year
+  String dateFilter = 'all';
   
   late AnimationController _animationController;
   late AnimationController _searchController;
@@ -105,7 +109,6 @@ class _ProductListingScreenState extends State<ProductListingScreen>
       curve: Curves.easeInOut,
     ));
 
-    // Calculate max price from products
     if (widget.products.isNotEmpty) {
       maxPrice = widget.products.map((p) => p.price).reduce((a, b) => a > b ? a : b);
       priceRange = RangeValues(0, maxPrice);
@@ -136,9 +139,8 @@ class _ProductListingScreenState extends State<ProductListingScreen>
   bool _matchesDateFilter(Product product) {
     if (dateFilter == 'all') return true;
     
-    // Mock date logic - replace with actual product date
     final now = DateTime.now();
-    final productDate = now.subtract(Duration(days: product.id % 365)); // Mock date based on ID
+    final productDate = now.subtract(Duration(days: product.id % 365));
     
     switch (dateFilter) {
       case 'today':
@@ -155,8 +157,7 @@ class _ProductListingScreenState extends State<ProductListingScreen>
   }
 
   bool _matchesDistanceFilter(Product product) {
-    // Mock distance logic - replace with actual geolocation calculation
-    double productDistance = (product.id % 100).toDouble(); // Mock distance based on ID
+    double productDistance = (product.id % 100).toDouble();
     return productDistance <= selectedDistance;
   }
 
@@ -169,19 +170,15 @@ class _ProductListingScreenState extends State<ProductListingScreen>
         products.sort((a, b) => b.price.compareTo(a.price));
         break;
       case 'date_new':
-        // Mock date sorting - replace with actual date comparison
         products.sort((a, b) => b.id.compareTo(a.id));
         break;
       case 'date_old':
-        // Mock date sorting - replace with actual date comparison
         products.sort((a, b) => a.id.compareTo(b.id));
         break;
       case 'distance':
-        // Mock distance sorting - replace with actual distance calculation
         products.sort((a, b) => (a.id % 100).compareTo(b.id % 100));
         break;
-      default: // relevance
-        // Keep original order or implement relevance logic
+      default:
         break;
     }
     return products;
@@ -189,6 +186,9 @@ class _ProductListingScreenState extends State<ProductListingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    
     List<Product> filteredProducts = widget.products.where((product) {
       bool matchesSearch = product.title.toLowerCase().contains(searchQuery.toLowerCase());
       bool matchesCategory = selectedCategory == 'All' || product.category == selectedCategory;
@@ -199,7 +199,6 @@ class _ProductListingScreenState extends State<ProductListingScreen>
       return matchesSearch && matchesCategory && matchesPrice && matchesDate && matchesDistance;
     }).toList();
 
-    // Apply sorting
     filteredProducts = _sortProducts(filteredProducts);
 
     return Theme(
@@ -229,7 +228,7 @@ class _ProductListingScreenState extends State<ProductListingScreen>
             SliverToBoxAdapter(
               child: FadeTransition(
                 opacity: _fadeAnimation,
-                child: _buildProductGrid(filteredProducts),
+                child: _buildProductGrid(filteredProducts, isSmallScreen),
               ),
             ),
           ],
@@ -289,25 +288,29 @@ class _ProductListingScreenState extends State<ProductListingScreen>
             ),
           ),
           const SizedBox(width: 12),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'EcoFinds',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+          const Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'EcoFinds',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                'Sustainable Marketplace',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.white70,
+                Text(
+                  'Sustainable Marketplace',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.white70,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -424,12 +427,15 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                       children: [
                         const Icon(Icons.tune, color: EcoColors.primaryGreen, size: 16),
                         const SizedBox(width: 8),
-                        const Text(
-                          'Advanced Filters',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: EcoColors.textDark,
+                        const Flexible(
+                          child: Text(
+                            'Advanced Filters',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: EcoColors.textDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const Spacer(),
@@ -467,8 +473,8 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                             activeColor: EcoColors.secondaryGreen,
                             inactiveColor: EcoColors.accentGreen.withOpacity(0.3),
                             labels: RangeLabels(
-                              '\$${priceRange.start.round()}',
-                              '\$${priceRange.end.round()}',
+                              '₹${priceRange.start.round()}',
+                              '₹${priceRange.end.round()}',
                             ),
                             onChanged: (RangeValues values) {
                               setState(() {
@@ -480,14 +486,14 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                '\$${priceRange.start.round()}',
+                                '₹${priceRange.start.round()}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: EcoColors.textLight,
                                 ),
                               ),
                               Text(
-                                '\$${priceRange.end.round()}',
+                                '₹${priceRange.end.round()}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: EcoColors.textLight,
@@ -533,15 +539,21 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                     _buildFilterSection(
                       'Date Added',
                       Icons.calendar_today,
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          _buildDateChip('All', 'all'),
-                          _buildDateChip('Today', 'today'),
-                          _buildDateChip('This Week', 'week'),
-                          _buildDateChip('This Month', 'month'),
-                          _buildDateChip('This Year', 'year'),
-                        ],
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildDateChip('All', 'all'),
+                            const SizedBox(width: 8),
+                            _buildDateChip('Today', 'today'),
+                            const SizedBox(width: 8),
+                            _buildDateChip('This Week', 'week'),
+                            const SizedBox(width: 8),
+                            _buildDateChip('This Month', 'month'),
+                            const SizedBox(width: 8),
+                            _buildDateChip('This Year', 'year'),
+                          ],
+                        ),
                       ),
                     ),
                     
@@ -549,16 +561,23 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                     _buildFilterSection(
                       'Sort By',
                       Icons.sort,
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          _buildSortChip('Relevance', 'relevance'),
-                          _buildSortChip('Price: Low to High', 'price_low'),
-                          _buildSortChip('Price: High to Low', 'price_high'),
-                          _buildSortChip('Newest First', 'date_new'),
-                          _buildSortChip('Oldest First', 'date_old'),
-                          _buildSortChip('Distance', 'distance'),
-                        ],
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildSortChip('Relevance', 'relevance'),
+                            const SizedBox(width: 8),
+                            _buildSortChip('Price: Low ↑', 'price_low'),
+                            const SizedBox(width: 8),
+                            _buildSortChip('Price: High ↓', 'price_high'),
+                            const SizedBox(width: 8),
+                            _buildSortChip('Newest', 'date_new'),
+                            const SizedBox(width: 8),
+                            _buildSortChip('Oldest', 'date_old'),
+                            const SizedBox(width: 8),
+                            _buildSortChip('Distance', 'distance'),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -577,12 +596,15 @@ class _ProductListingScreenState extends State<ProductListingScreen>
           children: [
             Icon(icon, color: EcoColors.primaryGreen, size: 14),
             const SizedBox(width: 6),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                color: EcoColors.textDark,
+            Flexible(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: EcoColors.textDark,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -620,6 +642,7 @@ class _ProductListingScreenState extends State<ProductListingScreen>
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );
@@ -651,6 +674,7 @@ class _ProductListingScreenState extends State<ProductListingScreen>
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );
@@ -709,12 +733,15 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                           size: 14,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          category,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : EcoColors.textDark,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            fontSize: 12,
+                        Flexible(
+                          child: Text(
+                            category,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : EcoColors.textDark,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -754,26 +781,31 @@ class _ProductListingScreenState extends State<ProductListingScreen>
             ),
           ),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: EcoColors.leafGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.eco, color: EcoColors.leafGreen, size: 12),
-                SizedBox(width: 3),
-                Text(
-                  'Verified Eco',
-                  style: TextStyle(
-                    color: EcoColors.leafGreen,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: EcoColors.leafGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.eco, color: EcoColors.leafGreen, size: 12),
+                  SizedBox(width: 3),
+                  Flexible(
+                    child: Text(
+                      'Verified Eco',
+                      style: TextStyle(
+                        color: EcoColors.leafGreen,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -808,58 +840,61 @@ class _ProductListingScreenState extends State<ProductListingScreen>
     String sortLabel = _getSortLabel();
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
-        children: [
-          Text(
-            '$productCount items',
-            style: const TextStyle(
-              color: EcoColors.textLight,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          if (sortBy != 'relevance') ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: EcoColors.primaryGreen.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Text(
+              '$productCount items',
+              style: const TextStyle(
+                color: EcoColors.textLight,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
-              child: Text(
-                'Sorted by $sortLabel',
-                style: const TextStyle(
-                  color: EcoColors.primaryGreen,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w500,
+            ),
+            if (sortBy != 'relevance') ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: EcoColors.primaryGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ),
-            ),
-          ],
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: EcoColors.accentGreen.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.trending_up, color: EcoColors.primaryGreen, size: 10),
-                SizedBox(width: 2),
-                Text(
-                  'Trending',
-                  style: TextStyle(
+                child: Text(
+                  'Sorted by $sortLabel',
+                  style: const TextStyle(
                     color: EcoColors.primaryGreen,
                     fontSize: 9,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-              ],
+              ),
+            ],
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: EcoColors.accentGreen.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.trending_up, color: EcoColors.primaryGreen, size: 10),
+                  SizedBox(width: 2),
+                  Text(
+                    'Trending',
+                    style: TextStyle(
+                      color: EcoColors.primaryGreen,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -875,7 +910,7 @@ class _ProductListingScreenState extends State<ProductListingScreen>
     }
   }
 
-  Widget _buildProductGrid(List<Product> filteredProducts) {
+  Widget _buildProductGrid(List<Product> filteredProducts, bool isSmallScreen) {
     if (filteredProducts.isEmpty) {
       return Container(
         height: 250,
@@ -903,6 +938,7 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                 fontSize: 12,
                 color: EcoColors.textLight,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -915,22 +951,23 @@ class _ProductListingScreenState extends State<ProductListingScreen>
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isGridView ? 2 : 1,
-          childAspectRatio: isGridView ? 0.85 : 2.5,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisCount: isGridView ? (isSmallScreen ? 1 : 2) : 1,
+          childAspectRatio: isGridView 
+              ? (isSmallScreen ? 1.2 : 0.85) 
+              : (isSmallScreen ? 3.5 : 2.5),
+          crossAxisSpacing: isSmallScreen ? 8 : 12,
+          mainAxisSpacing: isSmallScreen ? 8 : 12,
         ),
         itemCount: filteredProducts.length,
         itemBuilder: (context, index) {
           Product product = filteredProducts[index];
-          return _buildProductCard(product, index);
+          return _buildProductCard(product, index, isSmallScreen);
         },
       ),
     );
   }
 
-  Widget _buildProductCard(Product product, int index) {
-    // Mock images for carousel - replace with product.images when available
+  Widget _buildProductCard(Product product, int index, bool isSmallScreen) {
     List<String> mockImages = [
       'https://via.placeholder.com/300x200/81C784/FFFFFF?text=Eco+Product+1',
       'https://via.placeholder.com/300x200/66BB6A/FFFFFF?text=Eco+Product+2',
@@ -955,148 +992,157 @@ class _ProductListingScreenState extends State<ProductListingScreen>
               ),
             ],
           ),
-          child: isGridView ? _buildGridCard(product, mockImages) : _buildListCard(product, mockImages),
+          child: isGridView 
+              ? _buildGridCard(product, mockImages, isSmallScreen) 
+              : _buildListCard(product, mockImages, isSmallScreen),
         ),
       ),
     );
   }
 
-  Widget _buildGridCard(Product product, List<String> images) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 3,
-          child: _buildImageCarousel(images, isCompact: true),
-        ),
-        Expanded(
-          flex: 2,
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+Widget _buildGridCard(Product product, List<String> images, bool isSmallScreen) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        flex: 3,
+        child: _buildImageCarousel(images, product, isCompact: true),
+      ),
+      // Changed to Container with fixed constraints instead of Expanded
+      Container(
+        padding: EdgeInsets.all(isSmallScreen ? 8 : 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: EcoColors.accentGreen.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        product.category.toUpperCase(),
-                        style: const TextStyle(
-                          color: EcoColors.primaryGreen,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: EcoColors.accentGreen.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    const Spacer(),
-                    // Distance badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: EcoColors.skyBlue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
+                    child: Text(
+                      product.category.toUpperCase(),
+                      style: TextStyle(
+                        color: EcoColors.primaryGreen,
+                        fontSize: isSmallScreen ? 7 : 8,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.location_on, size: 8, color: EcoColors.skyBlue),
-                          Text(
-                            '${(product.id % 100)} km',
-                            style: const TextStyle(
-                              fontSize: 7,
-                              color: EcoColors.skyBlue,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  product.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: EcoColors.textDark,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const Spacer(),
-                Row(
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '₹${product.price.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: EcoColors.secondaryGreen,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: EcoColors.skyBlue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.location_on, size: isSmallScreen ? 6 : 8, color: EcoColors.skyBlue),
+                      Text(
+                        '${(product.id % 100)} km',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 6 : 7,
+                          color: EcoColors.skyBlue,
+                          fontWeight: FontWeight.w500,
                         ),
-                        Text(
-                          '${DateTime.now().subtract(Duration(days: product.id % 30)).day}d ago',
-                          style: const TextStyle(
-                            fontSize: 8,
-                            color: EcoColors.textLight,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    if (!product.isOwned)
-                      GestureDetector(
-                        onTap: () => widget.onAddToCart(product),
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: EcoColors.secondaryGreen,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Icon(
-                            Icons.add_shopping_cart,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildListCard(Product product, List<String> images) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 120,
-          height: double.infinity,
-          child: _buildImageCarousel(images, isCompact: false),
-        ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            SizedBox(height: isSmallScreen ? 4 : 6),
+            // Product Title - Now with guaranteed space
+            Text(
+              product.title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: isSmallScreen ? 12 : 13,
+                color: EcoColors.textDark,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            SizedBox(height: isSmallScreen ? 4 : 6),
+            Row(
               children: [
-                Row(
-                  children: [
-                    Container(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '₹${product.price.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          color: EcoColors.secondaryGreen,
+                          fontWeight: FontWeight.bold,
+                          fontSize: isSmallScreen ? 13 : 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${DateTime.now().subtract(Duration(days: product.id % 30)).day}d ago',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 7 : 8,
+                          color: EcoColors.textLight,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (!product.isOwned)
+                  GestureDetector(
+                    onTap: () => widget.onAddToCart(product),
+                    child: Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
+                      decoration: BoxDecoration(
+                        color: EcoColors.secondaryGreen,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.add_shopping_cart,
+                        color: Colors.white,
+                        size: isSmallScreen ? 12 : 14,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildListCard(Product product, List<String> images, bool isSmallScreen) {
+  return Row(
+    children: [
+      SizedBox(
+        width: isSmallScreen ? 80 : 120,
+        height: double.infinity,
+        child: _buildImageCarousel(images, product, isCompact: false),
+      ),
+      Expanded(
+        child: Padding(
+          padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: EcoColors.accentGreen.withOpacity(0.2),
@@ -1104,15 +1150,18 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                       ),
                       child: Text(
                         product.category.toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: EcoColors.primaryGreen,
-                          fontSize: 9,
+                          fontSize: isSmallScreen ? 7 : 9,
                           fontWeight: FontWeight.bold,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                       decoration: BoxDecoration(
                         color: EcoColors.skyBlue.withOpacity(0.1),
@@ -1121,49 +1170,56 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.location_on, size: 10, color: EcoColors.skyBlue),
+                          Icon(Icons.location_on, size: isSmallScreen ? 8 : 10, color: EcoColors.skyBlue),
                           const SizedBox(width: 2),
-                          Text(
-                            '${(product.id % 100)} km away',
-                            style: const TextStyle(
-                              fontSize: 8,
-                              color: EcoColors.skyBlue,
-                              fontWeight: FontWeight.w500,
+                          Flexible(
+                            child: Text(
+                              '${(product.id % 100)} km away',
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 6 : 8,
+                                color: EcoColors.skyBlue,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Spacer(),
-                    if (product.isOwned)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: EcoColors.earthBrown,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'OWNED',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  ),
+                  if (product.isOwned) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: EcoColors.earthBrown,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'OWNED',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmallScreen ? 6 : 8,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
+                    ),
                   ],
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Product Title - This was already present but ensuring it's visible
+              Text(
+                product.title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isSmallScreen ? 12 : 14,
+                  color: EcoColors.textDark,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  product.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: EcoColors.textDark,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (!isSmallScreen) ...[
                 const SizedBox(height: 4),
                 Text(
                   product.description,
@@ -1174,140 +1230,148 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const Spacer(),
-                Row(
-                  children: [
-                    Column(
+              ],
+              const Spacer(),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           '₹${product.price.toStringAsFixed(2)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: EcoColors.secondaryGreen,
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: isSmallScreen ? 14 : 16,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           'Added ${DateTime.now().subtract(Duration(days: product.id % 30)).day} days ago',
-                          style: const TextStyle(
-                            fontSize: 9,
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 7 : 9,
                             color: EcoColors.textLight,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
-                    const Spacer(),
-                    if (!product.isOwned)
-                      GestureDetector(
-                        onTap: () => widget.onAddToCart(product),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [EcoColors.secondaryGreen, EcoColors.leafGreen],
-                            ),
-                            borderRadius: BorderRadius.circular(15),
+                  ),
+                  if (!product.isOwned)
+                    GestureDetector(
+                      onTap: () => widget.onAddToCart(product),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 8 : 12, 
+                          vertical: isSmallScreen ? 4 : 6
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [EcoColors.secondaryGreen, EcoColors.leafGreen],
                           ),
-                          child: const Text(
-                            'Add to Cart',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Text(
+                          'Add to Cart',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: isSmallScreen ? 9 : 11,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                  ],
-                ),
-              ],
-            ),
+                    ),
+                ],
+              ),
+            ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildImageCarousel(List<String> images, {required bool isCompact}) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(isCompact ? 14 : 12),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            EcoColors.accentGreen.withOpacity(0.1),
-            EcoColors.leafGreen.withOpacity(0.1),
-          ],
-        ),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(isCompact ? 14 : 12),
-        child: Stack(
-          children: [
-            PageView.builder(
-              itemCount: images.length,
-              itemBuilder: (context, index) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        EcoColors.accentGreen.withOpacity(0.1),
-                        EcoColors.leafGreen.withOpacity(0.1),
-                      ],
-                    ),
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.eco,
-                          size: isCompact ? 24 : 32,
-                          color: EcoColors.accentGreen,
-                        ),
-                        if (!isCompact)
-                          Text(
-                            '${index + 1}/${images.length}',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: EcoColors.primaryGreen,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-            // Verified eco badge
-            Positioned(
-              top: 6,
-              right: 6,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: EcoColors.leafGreen,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.verified,
-                  color: Colors.white,
-                  size: isCompact ? 10 : 12,
-                ),
+    ],
+  );
+}
+
+// Also update the image carousel to remove the title overlay since it should be in the card
+Widget _buildImageCarousel(List<String> images, Product product, {required bool isCompact}) {
+  return Container(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(isCompact ? 14 : 12),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          EcoColors.accentGreen.withOpacity(0.1),
+          EcoColors.leafGreen.withOpacity(0.1),
+        ],
+      ),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(isCompact ? 14 : 12),
+      child: Stack(
+        children: [
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  EcoColors.accentGreen.withOpacity(0.1),
+                  EcoColors.leafGreen.withOpacity(0.1),
+                ],
               ),
             ),
-            // Image indicator dots
-            if (images.length > 1)
-              Positioned(
-                bottom: 6,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.eco,
+                    size: isCompact ? 24 : 32,
+                    color: EcoColors.accentGreen,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Eco Product',
+                    style: TextStyle(
+                      fontSize: isCompact ? 8 : 10,
+                      color: EcoColors.primaryGreen,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Verified eco badge
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: EcoColors.leafGreen,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.verified,
+                color: Colors.white,
+                size: isCompact ? 10 : 12,
+              ),
+            ),
+          ),
+          // Image indicator dots
+          if (images.length > 1)
+            Positioned(
+              bottom: 6,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
                   children: images.asMap().entries.map((entry) {
                     return Container(
                       width: isCompact ? 4 : 6,
@@ -1321,11 +1385,12 @@ class _ProductListingScreenState extends State<ProductListingScreen>
                   }).toList(),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   IconData _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {

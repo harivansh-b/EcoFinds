@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/product.dart';
+import 'package:eco_finds/env.dart';
+
+final String myurl = ApiConfig.baseUrl;
 
 // EcoFinds Color Palette (reuse from MainScreen)
 class EcoColors {
@@ -35,7 +38,7 @@ class AddNewProductScreen extends StatefulWidget {
   State<AddNewProductScreen> createState() => _AddNewProductScreenState();
 }
 
-class _AddNewProductScreenState extends State<AddNewProductScreen> 
+class _AddNewProductScreenState extends State<AddNewProductScreen>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _titleController;
@@ -44,70 +47,102 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
+
   String _selectedCategory = 'Electronics';
   String _selectedStatus = 'Available';
   bool _isSubmitting = false;
-  
+
   // Expanded eco-friendly categories
   final List<Map<String, dynamic>> categories = [
     {'name': 'Electronics', 'icon': Icons.devices, 'color': EcoColors.skyBlue},
-    {'name': 'Fashion', 'icon': Icons.checkroom, 'color': EcoColors.accentGreen},
+    {
+      'name': 'Fashion',
+      'icon': Icons.checkroom,
+      'color': EcoColors.accentGreen,
+    },
     {'name': 'Furniture', 'icon': Icons.weekend, 'color': EcoColors.earthBrown},
     {'name': 'Books', 'icon': Icons.menu_book, 'color': EcoColors.leafGreen},
-    {'name': 'Sports & Outdoors', 'icon': Icons.sports_soccer, 'color': EcoColors.secondaryGreen},
-    {'name': 'Home & Garden', 'icon': Icons.home, 'color': EcoColors.primaryGreen},
+    {
+      'name': 'Sports & Outdoors',
+      'icon': Icons.sports_soccer,
+      'color': EcoColors.secondaryGreen,
+    },
+    {
+      'name': 'Home & Garden',
+      'icon': Icons.home,
+      'color': EcoColors.primaryGreen,
+    },
   ];
 
   // Product status options
   final List<Map<String, dynamic>> statusOptions = [
-    {'name': 'Available', 'icon': Icons.check_circle, 'color': EcoColors.successGreen, 'description': 'Ready for sale'},
-    {'name': 'Reserved', 'icon': Icons.schedule, 'color': EcoColors.orangeWarning, 'description': 'Hold for buyer'},
-    {'name': 'Sold', 'icon': Icons.sell, 'color': EcoColors.textLight, 'description': 'No longer available'},
-    {'name': 'Draft', 'icon': Icons.edit_note, 'color': EcoColors.blueInfo, 'description': 'Not yet published'},
+    {
+      'name': 'Available',
+      'icon': Icons.check_circle,
+      'color': EcoColors.successGreen,
+      'description': 'Ready for sale',
+    },
+    {
+      'name': 'Reserved',
+      'icon': Icons.schedule,
+      'color': EcoColors.orangeWarning,
+      'description': 'Hold for buyer',
+    },
+    {
+      'name': 'Sold',
+      'icon': Icons.sell,
+      'color': EcoColors.textLight,
+      'description': 'No longer available',
+    },
+    {
+      'name': 'Draft',
+      'icon': Icons.edit_note,
+      'color': EcoColors.blueInfo,
+      'description': 'Not yet published',
+    },
   ];
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.product?.title ?? '');
-    _descriptionController = TextEditingController(text: widget.product?.description ?? '');
-    _priceController = TextEditingController(text: widget.product?.price.toString() ?? '');
-    
+    _descriptionController = TextEditingController(
+      text: widget.product?.description ?? '',
+    );
+    _priceController = TextEditingController(
+      text: widget.product?.price.toString() ?? '',
+    );
+
     if (widget.product != null) {
       _selectedCategory = widget.product!.category;
       // Assuming the Product model will have a status field
       _selectedStatus = widget.product!.status ?? 'Available';
     }
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-    
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+
     _animationController.forward();
   }
 
   @override
   Widget build(BuildContext context) {
     bool isEditing = widget.product != null;
-    
+
     return Scaffold(
       backgroundColor: EcoColors.backgroundWhite,
       body: CustomScrollView(
@@ -151,10 +186,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                EcoColors.primaryGreen,
-                EcoColors.secondaryGreen,
-              ],
+              colors: [EcoColors.primaryGreen, EcoColors.secondaryGreen],
             ),
           ),
           child: Stack(
@@ -177,7 +209,9 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
                     const Icon(Icons.eco, color: Colors.white, size: 24),
                     const SizedBox(height: 4),
                     Text(
-                      isEditing ? 'Update your eco-listing' : 'Share something sustainable',
+                      isEditing
+                          ? 'Update your eco-listing'
+                          : 'Share something sustainable',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 14,
@@ -202,7 +236,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 20),
-            
+
             // Product Title Section
             _buildSectionHeader('Item Details', Icons.info_outline),
             const SizedBox(height: 16),
@@ -219,7 +253,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
               },
             ),
             const SizedBox(height: 20),
-            
+
             // Category Section
             _buildSectionHeader('Category', Icons.category_outlined),
             const SizedBox(height: 16),
@@ -231,7 +265,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
             const SizedBox(height: 16),
             _buildStatusSelector(),
             const SizedBox(height: 20),
-            
+
             // Description
             _buildCustomTextField(
               controller: _descriptionController,
@@ -247,19 +281,19 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
               },
             ),
             const SizedBox(height: 20),
-            
+
             // Price Section
             _buildSectionHeader('Pricing', Icons.attach_money),
             const SizedBox(height: 16),
             _buildPriceField(),
             const SizedBox(height: 20),
-            
+
             // Image Section
             _buildSectionHeader('Photos', Icons.photo_camera_outlined),
             const SizedBox(height: 16),
             _buildImageUploadCard(),
             const SizedBox(height: 40),
-            
+
             // Submit Button
             _buildSubmitButton(isEditing),
             const SizedBox(height: 20),
@@ -329,7 +363,10 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: EcoColors.primaryGreen, width: 2),
+            borderSide: const BorderSide(
+              color: EcoColors.primaryGreen,
+              width: 2,
+            ),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -391,7 +428,9 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
                     category['name'],
                     style: TextStyle(
                       color: isSelected ? Colors.white : EcoColors.textDark,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ],
@@ -431,14 +470,12 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isSelected 
-                    ? status['color'].withOpacity(0.1) 
+                color: isSelected
+                    ? status['color'].withOpacity(0.1)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isSelected 
-                      ? status['color'] 
-                      : Colors.grey.shade200,
+                  color: isSelected ? status['color'] : Colors.grey.shade200,
                   width: isSelected ? 2 : 1,
                 ),
               ),
@@ -464,11 +501,11 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
                         Text(
                           status['name'],
                           style: TextStyle(
-                            color: isSelected 
-                                ? status['color'] 
+                            color: isSelected
+                                ? status['color']
                                 : EcoColors.textDark,
-                            fontWeight: isSelected 
-                                ? FontWeight.bold 
+                            fontWeight: isSelected
+                                ? FontWeight.bold
                                 : FontWeight.w600,
                             fontSize: 16,
                           ),
@@ -485,11 +522,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
                     ),
                   ),
                   if (isSelected)
-                    Icon(
-                      Icons.check_circle,
-                      color: status['color'],
-                      size: 20,
-                    ),
+                    Icon(Icons.check_circle, color: status['color'], size: 20),
                 ],
               ),
             ),
@@ -515,7 +548,11 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
       child: TextFormField(
         controller: _priceController,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        style: const TextStyle(color: EcoColors.textDark, fontSize: 18, fontWeight: FontWeight.w600),
+        style: const TextStyle(
+          color: EcoColors.textDark,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
         decoration: InputDecoration(
           labelText: 'Price',
           hintText: '0.00',
@@ -542,7 +579,10 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: EcoColors.primaryGreen, width: 2),
+            borderSide: const BorderSide(
+              color: EcoColors.primaryGreen,
+              width: 2,
+            ),
           ),
           filled: true,
           fillColor: Colors.white,
@@ -620,10 +660,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
               SizedBox(height: 4),
               Text(
                 'Tap to add up to 5 photos',
-                style: TextStyle(
-                  color: EcoColors.textLight,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: EcoColors.textLight, fontSize: 12),
               ),
             ],
           ),
@@ -667,10 +704,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    isEditing ? Icons.update : Icons.eco,
-                    size: 20,
-                  ),
+                  Icon(isEditing ? Icons.update : Icons.eco, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     isEditing ? 'Update Listing' : 'List Item',
@@ -704,12 +738,12 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
         isOwned: true,
         status: _selectedStatus, // Add status to the product
       );
-      
+
       widget.onProductAdded(newProduct);
-      
+
       if (mounted) {
         Navigator.pop(context);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -718,8 +752,8 @@ class _AddNewProductScreenState extends State<AddNewProductScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    widget.product != null 
-                        ? 'Item updated successfully!' 
+                    widget.product != null
+                        ? 'Item updated successfully!'
                         : 'Item listed successfully!',
                     style: const TextStyle(color: Colors.white),
                   ),

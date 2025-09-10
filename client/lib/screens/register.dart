@@ -4,7 +4,9 @@ import 'dart:convert';
 import 'dart:async';
 import 'location_picker.dart';
 
-const String myurl = "http://127.0.0.1:8000";
+import 'package:eco_finds/env.dart';
+
+final String myurl = ApiConfig.baseUrl;
 const String apiKey = "auth_api@12!_23";
 
 // EcoFinds Color Palette
@@ -214,6 +216,7 @@ class _CompleteRegisterScreenState extends State<CompleteRegisterScreen> {
               'hashed_password': signupData!['hashed_password'],
               'phone': phoneController.text.trim(),
             },
+            userId: generatedUserId ?? '',
           ),
         ),
       );
